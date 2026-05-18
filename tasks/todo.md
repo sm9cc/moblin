@@ -520,3 +520,42 @@ Date: 2026-05-18
   - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: low SRTLA callback impact, no affected flows, test gap for private `NWConnection` callback.
+
+## Continued sweep 2026-05-18 RTSP fragmented RTP payload guards
+
+### Assumptions
+
+- RTP packets have already been normalized before the codec depacketizers run.
+- H.264 FU-A packets must include FU indicator, FU header, and at least one byte of fragment payload.
+- H.265 FU packets must include the two-byte payload header, FU header, and at least one byte of fragment payload.
+
+### Acceptance criteria
+
+- H.264 FU-A packets with only FU indicator and FU header are rejected before frame assembly.
+- H.265 FU packets with only payload header and FU header are rejected before frame assembly.
+- Valid fragmented H.264 and H.265 packets keep their existing assembly paths.
+
+### Checklist
+
+- [x] Select a high-risk RTSP/RTP depacketizer path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 21 checks:
+  - Red check: H.264 FU-A packets with only FU indicator and FU header appended an empty fragment payload.
+  - Red check: H.265 FU packets with only payload header and FU header appended an empty fragment payload.
+  - Corpus check: FFmpeg rejects H.264 FU-A input shorter than FU indicator, FU header, and one payload byte.
+  - Corpus check: FFmpeg rejects or defers HEVC FU input with no payload bytes after the FU header.
+  - Green check: H.264 FU-A now requires 15 normalized RTP bytes, preserving the existing valid assembly path.
+  - Green check: H.265 FU now requires 16 normalized RTP bytes, preserving the existing valid assembly path.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: low RTSP codec impact, no affected flows, test gap for private codec processors.

@@ -429,6 +429,9 @@ private class RtpProcessorVideoH264: RtpVideoProcessor {
     }
 
     private func processBufferTypeFuA(packet: Data, timestamp: Int64) throws {
+        guard packet.count >= 15 else {
+            throw "Packet shorter than 15 bytes: \(packet)"
+        }
         let fuIndicator = packet[12]
         let fuHeader = packet[13]
         let startBit = fuHeader >> 7
@@ -480,8 +483,8 @@ private class RtpProcessorVideoH265: RtpVideoProcessor {
     }
 
     private func processBufferTypeFu(packet: Data, timestamp: Int64) throws {
-        guard packet.count >= 15 else {
-            throw "Packet shorter than 15 bytes: \(packet)"
+        guard packet.count >= 16 else {
+            throw "Packet shorter than 16 bytes: \(packet)"
         }
         let fuHeader = packet[14]
         let startBit = fuHeader >> 7
