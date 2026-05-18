@@ -71,6 +71,8 @@ final class WebrtcIngestClient: @unchecked Sendable {
     private var videoTimestampOffset: Double?
     private var audioTimestampOffset: Double?
     private let dispatchQueue: DispatchQueue
+    private var peerConnectionUserPointer: UnsafeMutableRawPointer?
+    private var trackUserPointers: [Int32: UnsafeMutableRawPointer] = [:]
 
     init(streamId: UUID,
          latency: Double,
@@ -88,6 +90,10 @@ final class WebrtcIngestClient: @unchecked Sendable {
         self.delegate = delegate
     }
 
+    deinit {
+        stopInternal()
+    }
+
     func createPeerConnection() throws {
         var config = rtcConfiguration()
         peerConnectionId = iceServers.withCPointers {
@@ -98,7 +104,9 @@ final class WebrtcIngestClient: @unchecked Sendable {
         guard peerConnectionId >= 0 else {
             throw "Failed to create peer connection"
         }
-        rtcSetUserPointer(peerConnectionId, Unmanaged.passRetained(self).toOpaque())
+        let pointer = Unmanaged.passRetained(self).toOpaque()
+        peerConnectionUserPointer = pointer
+        rtcSetUserPointer(peerConnectionId, pointer)
         try checkOk(rtcSetStateChangeCallback(peerConnectionId) { _, state, pointer in
             toIngestClient(pointer: pointer)?.handleStateChange(state: state)
         })
@@ -173,9 +181,8 @@ final class WebrtcIngestClient: @unchecked Sendable {
 
     func setTrackCodec(trackId: Int32, description: String) {
         let descriptionLower = description.lowercased()
-        let clientPointer = Unmanaged.passRetained(self).toOpaque()
-        rtcSetUserPointer(trackId, clientPointer)
         if let videoCodec = VideoCodec(trackDescription: descriptionLower) {
+            setTrackUserPointer(trackId: trackId)
             self.videoCodec = videoCodec
             videoTrackId = trackId
             switch videoCodec {
@@ -195,6 +202,7 @@ final class WebrtcIngestClient: @unchecked Sendable {
                                                                      timestampSeconds: timestampSeconds)
             }
         } else if descriptionLower.contains("opus") {
+            setTrackUserPointer(trackId: trackId)
             audioTrackId = trackId
             setupOpusDecoder()
             rtcSetOpusDepacketizer(trackId)
@@ -217,13 +225,43 @@ final class WebrtcIngestClient: @unchecked Sendable {
         opusAudioConverter = nil
         opusCompressedBuffer = nil
         pcmAudioBuffer = nil
-        rtcDeletePeerConnection(peerConnectionId)
+        if peerConnectionId >= 0 {
+            rtcDeletePeerConnection(peerConnectionId)
+        }
         peerConnectionId = -1
+        videoTrackId = -1
+        audioTrackId = -1
+        releaseUserPointers()
         connected = false
         videoTimestampOffset = nil
         audioTimestampOffset = nil
         if let reason {
             delegate?.webrtcIngestClientOnDisconnected(streamId: streamId, reason: reason)
+        }
+    }
+
+    private func setTrackUserPointer(trackId: Int32) {
+        releaseTrackUserPointer(trackId: trackId)
+        let pointer = Unmanaged.passRetained(self).toOpaque()
+        trackUserPointers[trackId] = pointer
+        rtcSetUserPointer(trackId, pointer)
+    }
+
+    private func releaseTrackUserPointer(trackId: Int32) {
+        guard let pointer = trackUserPointers.removeValue(forKey: trackId) else {
+            return
+        }
+        Unmanaged<WebrtcIngestClient>.fromOpaque(pointer).release()
+    }
+
+    private func releaseUserPointers() {
+        for pointer in trackUserPointers.values {
+            Unmanaged<WebrtcIngestClient>.fromOpaque(pointer).release()
+        }
+        trackUserPointers.removeAll()
+        if let pointer = peerConnectionUserPointer {
+            Unmanaged<WebrtcIngestClient>.fromOpaque(pointer).release()
+            peerConnectionUserPointer = nil
         }
     }
 

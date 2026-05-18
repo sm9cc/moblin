@@ -38,6 +38,10 @@ final class WhipServerClient {
         )
     }
 
+    deinit {
+        stop()
+    }
+
     func handleOffer(sdpOffer: String, completion: @escaping (String?) -> Void) {
         guard let ingestClient else {
             completion(nil)

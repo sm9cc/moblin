@@ -132,13 +132,16 @@ private func toRtcTrack(pointer: UnsafeMutableRawPointer?) -> RtcTrack? {
 }
 
 private final class RtcTrack {
-    private let trackId: Int32
+    private var trackId: Int32
+    private var userPointer: UnsafeMutableRawPointer?
     private var state: TrackState = .connecting
 
     init(trackId: Int32) throws {
         self.trackId = trackId
         do {
-            rtcSetUserPointer(trackId, Unmanaged.passRetained(self).toOpaque())
+            let pointer = Unmanaged.passRetained(self).toOpaque()
+            userPointer = pointer
+            rtcSetUserPointer(trackId, pointer)
             try checkOk(rtcSetOpenCallback(trackId) { _, pointer in
                 toRtcTrack(pointer: pointer)?.setState(state: .open)
             })
@@ -154,13 +157,24 @@ private final class RtcTrack {
                 })
             }
         } catch {
-            rtcDeleteTrack(trackId)
+            close()
             throw error
         }
     }
 
     deinit {
-        rtcDeleteTrack(trackId)
+        close()
+    }
+
+    private func close() {
+        if trackId >= 0 {
+            rtcDeleteTrack(trackId)
+            trackId = -1
+        }
+        if let userPointer {
+            Unmanaged<RtcTrack>.fromOpaque(userPointer).release()
+            self.userPointer = nil
+        }
     }
 
     func setTimestamp(presentationTimeStamp: Double) throws {
@@ -264,7 +278,8 @@ private func toPeerConnection(pointer: UnsafeMutableRawPointer?) -> PeerConnecti
 }
 
 private final class PeerConnection {
-    private let peerConnectionId: Int32
+    private var peerConnectionId: Int32
+    private var userPointer: UnsafeMutableRawPointer?
     weak var delegate: (any PeerConnectionDelegate)?
 
     init(delegate: any PeerConnectionDelegate, iceServers: [String]) throws {
@@ -277,7 +292,9 @@ private final class PeerConnection {
         }
         try checkOk(peerConnectionId)
         do {
-            rtcSetUserPointer(peerConnectionId, Unmanaged.passRetained(self).toOpaque())
+            let pointer = Unmanaged.passRetained(self).toOpaque()
+            userPointer = pointer
+            rtcSetUserPointer(peerConnectionId, pointer)
             try checkOk(rtcSetStateChangeCallback(peerConnectionId) { _, state, pointer in
                 toPeerConnection(pointer: pointer)?.handleStateChange(state: state)
             })
@@ -285,13 +302,24 @@ private final class PeerConnection {
                 toPeerConnection(pointer: pointer)?.handleGatheringStateChange(state: state)
             })
         } catch {
-            rtcDeletePeerConnection(peerConnectionId)
+            close()
             throw error
         }
     }
 
+    deinit {
+        close()
+    }
+
     func close() {
-        rtcDeletePeerConnection(peerConnectionId)
+        if peerConnectionId >= 0 {
+            rtcDeletePeerConnection(peerConnectionId)
+            peerConnectionId = -1
+        }
+        if let userPointer {
+            Unmanaged<PeerConnection>.fromOpaque(userPointer).release()
+            self.userPointer = nil
+        }
     }
 
     func addTrack(config: RtcTrackConfig, streamId: String) throws -> RtcTrack {

@@ -946,3 +946,44 @@ Date: 2026-05-18
   - `swift test --filter RtmpStreamSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: low working-tree risk with no affected flows; reported expected test gaps for the private receive loop.
+
+## Continued sweep 2026-05-18 WebRTC callback user-pointer lifetime
+
+### Assumptions
+
+- libdatachannel stores user pointers but does not own Swift `Unmanaged` retains.
+- Swift objects retained for native callbacks must release those retains after deleting the peer connection or track.
+- Native delete calls should stay guarded so repeated stop paths do not delete invalid IDs.
+
+### Acceptance criteria
+
+- `WebrtcIngestClient` releases peer-connection and track callback retains on stop.
+- WHIP `PeerConnection` and `RtcTrack` release their callback retains on close/deinit and on throwing init cleanup.
+- `WhipServerClient` stops its ingest client on deinit so overwritten sessions do not leave native callbacks alive.
+- Repeated stop/close paths do not call libdatachannel delete APIs with invalid IDs.
+
+### Checklist
+
+- [x] Select a high-risk WebRTC lifecycle path using local code plus WHIP/WHEP corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 32 checks:
+  - Red check: WebRTC ingest and WHIP sender code used `Unmanaged.passRetained` for libdatachannel callback pointers, but stop/close paths never released those retains.
+  - Red check: repeated stop/close paths could call libdatachannel delete APIs again with already-invalid peer connection or track IDs.
+  - Corpus check: WHIP/WHEP reference implementations treat sessions as explicit resources with close/delete lifecycle; local native callback resources need matching teardown.
+  - Green check: peer connection and track user-pointer retains now release after native delete, throwing init cleanup releases retained callback owners, and repeated close paths are guarded.
+  - Green check: `WhipServerClient` stops its ingest client on deinit so replaced WHIP sessions do not leave native callbacks alive.
+  - Test gap: libdatachannel callback ownership requires the native runtime; no new unit test was added.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtmpStreamSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: medium working-tree risk with no affected flows; reported expected native WebRTC lifecycle test gaps.
