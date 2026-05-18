@@ -743,13 +743,13 @@ class RtspClient: @unchecked Sendable {
             return nil
         }
         let ha1 = md5String(data: "\(username):\(realm):\(password)")
-        let ha2 = md5String(data: "\(request.method):\(url)")
+        let ha2 = md5String(data: "\(request.method):\(request.url)")
         let response = md5String(data: "\(ha1):\(nonce):\(ha2)")
         return """
         Digest username="\(username)", \
         realm="\(realm)", \
         nonce="\(nonce)", \
-        uri="\(url)", \
+        uri="\(request.url)", \
         response="\(response)"
         """
     }

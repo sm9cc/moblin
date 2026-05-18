@@ -714,3 +714,40 @@ Date: 2026-05-18
   - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: low RTSP body parser impact, no affected flows; reported test gap for private receive callbacks.
+
+## Continued sweep 2026-05-18 RTSP digest request URI
+
+### Assumptions
+
+- Digest authentication must hash and report the URI for the request being sent.
+- RTSP SETUP can use a media control URL that differs from the original DESCRIBE URL.
+- Keep the current MD5-only Digest support unchanged.
+
+### Acceptance criteria
+
+- Digest `ha2` uses `request.url`, matching the URI written in the RTSP request line.
+- Digest `uri="..."` uses `request.url`.
+- DESCRIBE remains unchanged because its request URL is the base RTSP URL.
+
+### Checklist
+
+- [x] Select a high-risk RTSP authentication path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 26 checks:
+  - Red check: RTSP Digest `ha2` and `uri` used the client's base URL even when the outgoing request line used `request.url`.
+  - Corpus check: FFmpeg hashes `method:uri` and emits the same request URI in the Digest `uri` field.
+  - Green check: Moblin now hashes and reports `request.url`, matching `Request.pack(cSeq:)`.
+  - Scope check: MD5-only Digest support, realm, nonce, and retry behavior are unchanged.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: low RTSP auth impact, no affected flows; reported a test gap for the private auth path.
