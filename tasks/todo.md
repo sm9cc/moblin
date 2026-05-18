@@ -987,3 +987,42 @@ Date: 2026-05-18
   - `swift test --filter RtmpStreamSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: medium working-tree risk with no affected flows; reported expected native WebRTC lifecycle test gaps.
+
+## Continued sweep 2026-05-18 SRT callback context lifetime
+
+### Assumptions
+
+- libsrt callback context pointers do not own Swift `Unmanaged` retains.
+- Swift objects retained for SRT callbacks must release those retains after the SRT socket is closed or callback setup fails.
+- Existing SRT close behavior should remain asynchronous on `processorControlQueue` for the old sender path.
+
+### Acceptance criteria
+
+- `SrtStreamOfficial` releases its retained send-hook context on close, deinit, and connect failure after callback registration.
+- `SrtServer` releases its retained listen-callback context on stop and listen-callback setup failure.
+- Repeated close/stop paths do not double-release retained callback contexts.
+
+### Checklist
+
+- [x] Select high-risk SRT callback context paths using local code and SRT corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 33 checks:
+  - Red check: `SrtStreamOfficial` retained its `SendHook` for the SRT send callback and never released that retain on close, deinit, or connect failure after callback registration.
+  - Red check: `SrtServer` retained itself for the SRT listen callback and never released that retain on stop or callback setup failure.
+  - Green check: SRT callback contexts now release after socket close, setup failure paths release the newly retained context, and repeated setup/close paths release at most once.
+  - Scope check: SRT send/listen callback signatures and callback behavior are unchanged.
+  - Test gap: libsrt callback ownership requires the native runtime; no new unit test was added.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: medium working-tree risk with no affected flows; reported expected native SRT callback test gaps.

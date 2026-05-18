@@ -9,6 +9,7 @@ class SrtServer: @unchecked Sendable {
     private let timecodesEnabled: Bool
     private let port: UInt16
     private let srtlaPatches: Bool
+    private var listenCallbackContext: UnsafeMutableRawPointer?
 
     init(timecodesEnabled: Bool, port: UInt16, srtlaPatches: Bool) {
         self.timecodesEnabled = timecodesEnabled
@@ -31,6 +32,7 @@ class SrtServer: @unchecked Sendable {
     func stop() {
         srt_close(listenerSocket)
         listenerSocket = SRT_INVALID_SOCK
+        releaseListenCallbackContext()
         running = false
         srt_cleanup()
     }
@@ -117,7 +119,9 @@ class SrtServer: @unchecked Sendable {
         guard res != SRT_ERROR else {
             throw "Listen failed: \(lastSrtSocketError())"
         }
+        releaseListenCallbackContext()
         let server = Unmanaged.passRetained(self).toOpaque()
+        listenCallbackContext = server
         res = srt_listen_callback(
             listenerSocket,
             { server, _, _, _, streamIdIn in
@@ -133,8 +137,17 @@ class SrtServer: @unchecked Sendable {
             server
         )
         guard res != SRT_ERROR else {
+            releaseListenCallbackContext()
             throw "Listen callback failed: \(lastSrtSocketError())"
         }
+    }
+
+    private func releaseListenCallbackContext() {
+        guard let listenCallbackContext else {
+            return
+        }
+        Unmanaged<SrtServer>.fromOpaque(listenCallbackContext).release()
+        self.listenCallbackContext = nil
     }
 
     private func accept() throws -> Int32 {

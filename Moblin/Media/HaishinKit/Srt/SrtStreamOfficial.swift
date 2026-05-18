@@ -25,6 +25,7 @@ class SrtStreamOfficial: @unchecked Sendable {
     private var options: [SrtSocketOption: String] = [:]
     private var perf = CBytePerfMon()
     private var socket: SRTSOCKET = SRT_INVALID_SOCK
+    private var sendHookContext: UnsafeMutableRawPointer?
     weak var srtStreamDelegate: (any SrtStreamOfficialDelegate)?
     private let processor: Processor
 
@@ -62,6 +63,7 @@ class SrtStreamOfficial: @unchecked Sendable {
     }
 
     deinit {
+        closeSocket()
         srt_cleanup()
     }
 
@@ -77,12 +79,24 @@ class SrtStreamOfficial: @unchecked Sendable {
     func close() {
         processorControlQueue.async {
             self.readyState = .initialized
-            guard self.socket != SRT_INVALID_SOCK else {
-                return
-            }
-            srt_close(self.socket)
-            self.socket = SRT_INVALID_SOCK
+            self.closeSocket()
         }
+    }
+
+    private func closeSocket() {
+        if socket != SRT_INVALID_SOCK {
+            srt_close(socket)
+            socket = SRT_INVALID_SOCK
+        }
+        releaseSendHookContext()
+    }
+
+    private func releaseSendHookContext() {
+        guard let sendHookContext else {
+            return
+        }
+        Unmanaged<SendHook>.fromOpaque(sendHookContext).release()
+        self.sendHookContext = nil
     }
 
     func getPerformanceData() -> SrtPerformanceData {
@@ -136,7 +150,9 @@ class SrtStreamOfficial: @unchecked Sendable {
         if socket == SRT_INVALID_SOCK {
             throw makeSocketError()
         }
+        releaseSendHookContext()
         let context = Unmanaged.passRetained(sendHook).toOpaque()
+        sendHookContext = context
         srt_send_callback(socket,
                           { context, _, buf1, size1, buf2, size2 in
                               guard let context, let buf1, let buf2 else {
@@ -157,25 +173,30 @@ class SrtStreamOfficial: @unchecked Sendable {
                               }
                           },
                           context)
-        self.options = options
-        guard configure(.pre) else {
-            throw makeSocketError()
+        do {
+            self.options = options
+            guard configure(.pre) else {
+                throw makeSocketError()
+            }
+            var addrCopy = addr
+            let result = withUnsafePointer(to: &addrCopy) { addrCopyPointer -> Int32 in
+                srt_connect(
+                    socket,
+                    UnsafeRawPointer(addrCopyPointer).assumingMemoryBound(to: sockaddr.self),
+                    Int32(MemoryLayout.size(ofValue: addr))
+                )
+            }
+            if result == SRT_ERROR {
+                throw makeSocketError()
+            }
+            guard configure(.post) else {
+                throw makeSocketError()
+            }
+            readyState = .publishing
+        } catch {
+            closeSocket()
+            throw error
         }
-        var addrCopy = addr
-        let result = withUnsafePointer(to: &addrCopy) { addrCopyPointer -> Int32 in
-            srt_connect(
-                socket,
-                UnsafeRawPointer(addrCopyPointer).assumingMemoryBound(to: sockaddr.self),
-                Int32(MemoryLayout.size(ofValue: addr))
-            )
-        }
-        if result == SRT_ERROR {
-            throw makeSocketError()
-        }
-        guard configure(.post) else {
-            throw makeSocketError()
-        }
-        readyState = .publishing
     }
 
     private func configure(_ binding: SrtSocketOption.Binding) -> Bool {
