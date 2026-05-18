@@ -9,7 +9,7 @@ class LocalListener: @unchecked Sendable {
 
     init() {}
 
-    func start() {
+    func start() -> Bool {
         do {
             let options = NWProtocolUDP.Options()
             let parameters = NWParameters(dtls: .none, udp: options)
@@ -17,11 +17,13 @@ class LocalListener: @unchecked Sendable {
             listener = try NWListener(using: parameters)
         } catch {
             logger.info("srtla: local: Failed to create listener with error \(error)")
-            return
+            onError?("failed to create local listener")
+            return false
         }
         listener.stateUpdateHandler = handleListenerStateChange(to:)
         listener.newConnectionHandler = handleNewListenerConnection(connection:)
         listener.start(queue: srtlaClientQueue)
+        return true
     }
 
     func stop() {
@@ -43,7 +45,11 @@ class LocalListener: @unchecked Sendable {
         case .setup:
             break
         case .ready:
-            onReady?(listener.port!.rawValue)
+            guard let port = listener.port else {
+                onError?("missing local listener port")
+                return
+            }
+            onReady?(port.rawValue)
         default:
             onError?("bad network state")
         }

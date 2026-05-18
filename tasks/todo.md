@@ -292,3 +292,42 @@ Date: 2026-05-18
   - `make lint`: blocked because `swiftlint` is unavailable in this shell.
   - `swift test`: blocked because `swift` is unavailable in this shell.
   - code-review-graph: high MPEG-TS shared-code impact, no affected flows.
+
+## Continued sweep 2026-05-18 SRTLA local listener startup
+
+### Assumptions
+
+- Official SRT implementation needs the local UDP listener to start before the client can become ready.
+- Listener creation failure must surface through the existing SRTLA disconnect/error path.
+- Keep the fix to startup/error state ordering only.
+
+### Acceptance criteria
+
+- A local listener creation failure does not leave the client waiting forever for readiness.
+- Ready callbacks are accepted even if Network reports `.ready` immediately after `start(queue:)`.
+- Existing listener stop behavior remains unchanged.
+
+### Checklist
+
+- [x] Select a high-risk SRTLA startup path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 15 checks:
+  - Red check: `LocalListener.start()` swallowed `NWListener` creation failure, and `SrtlaClient` moved to `.waitForLocalSocketListening` after startup returned.
+  - Corpus check: BELABOX SRTLA receiver exits on UDP socket setup failure instead of waiting for readiness that cannot happen.
+  - Green check: listener creation failure now calls the existing SRTLA error path and reports `false` to the caller.
+  - State-ordering check: official SRT mode enters `.waitForLocalSocketListening` before starting the listener, so immediate ready/error callbacks are handled.
+  - Safety check: `.ready` no longer force unwraps `listener.port`.
+  - Static check: no `listener.port!` remains in `LocalListener`, and `SrtlaClient` guards the listener start result.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: high SRTLA shared-code impact, no affected flows.

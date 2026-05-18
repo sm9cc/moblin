@@ -374,11 +374,14 @@ class SrtlaClient: NSObject, @unchecked Sendable {
         guard localListener == nil else {
             return
         }
-        localListener = LocalListener()
-        localListener!.onReady = handleLocalReady(port:)
-        localListener!.onError = handleLocalError
-        localListener!.start()
+        let localListener = LocalListener()
+        localListener.onReady = handleLocalReady(port:)
+        localListener.onError = handleLocalError
+        self.localListener = localListener
         state = .waitForLocalSocketListening
+        guard localListener.start() else {
+            return
+        }
     }
 
     private func stopListener() {
