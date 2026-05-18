@@ -791,3 +791,43 @@ Date: 2026-05-18
   - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: medium RTSP parser impact, no affected flows; reported test gaps for private/internal RTSP parser entities despite focused `RtspClientSuite` coverage.
+
+## Continued sweep 2026-05-18 RTSP fragmented RTP state
+
+### Assumptions
+
+- RTP packets have already been normalized before H.264 and H.265 depacketizers run.
+- A fragmented NAL continuation without an active fragmented NAL is malformed and must not be appended to prior complete frame data.
+- An unfinished fragmented NAL should be dropped when a new single NAL or new fragmented start arrives.
+
+### Acceptance criteria
+
+- H.264 FU-A continuations before a start fragment are rejected.
+- H.265 FU continuations before a start fragment are rejected.
+- New single NAL or fragmented-start packets do not decode a previously incomplete fragmented NAL.
+- Completed fragmented NALs still decode on the next frame boundary as before.
+
+### Checklist
+
+- [x] Select a high-risk RTSP fragmented RTP path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 28 checks:
+  - Red check: H.264 and H.265 RTP FU continuations appended payload bytes even when no fragmented NAL was active, so malformed continuations could corrupt the prior complete frame.
+  - Red check: a new single NAL or FU start decoded the prior `data` buffer even when that buffer held an unfinished fragmented NAL.
+  - Corpus check: MistServer drops H.264 FU-A continuations before a start bit, GStreamer tracks the current FU type and drops continuations when no FU is active, and FFmpeg rejects HEVC packets with both S and E set.
+  - Green check: H.264 and H.265 processors now track active fragmented NAL state, reject continuations without a start, reject packets with both start and end bits set, and drop incomplete fragmented data at the next frame boundary.
+  - Scope check: valid single NALs, FU starts, FU continuations, and completed fragmented frames keep the same assembly layout.
+  - Test gap: codec processors are private and require live `CMFormatDescription` setup; no new unit test was added for this private state path.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: medium RTSP parser impact, no affected flows; reported test gaps for private/internal RTSP entities.

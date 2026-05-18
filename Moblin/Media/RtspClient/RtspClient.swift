@@ -429,6 +429,8 @@ extension RtpVideoProcessor: VideoDecoderDelegate {
 }
 
 private class RtpProcessorVideoH264: RtpVideoProcessor {
+    private var fragmentedFrameStarted = false
+
     override func process(packet: Data, timestamp: Int64) throws {
         guard packet.count >= 14 else {
             throw "Packet shorter than 14 bytes: \(packet)"
@@ -445,7 +447,12 @@ private class RtpProcessorVideoH264: RtpVideoProcessor {
     }
 
     private func processBufferTypeSingle(packet: Data, timestamp: Int64) throws {
-        decodeFrame()
+        if fragmentedFrameStarted {
+            data.removeAll(keepingCapacity: true)
+            fragmentedFrameStarted = false
+        } else {
+            decodeFrame()
+        }
         startNewFrame(timestamp: timestamp, first: packet[12...])
     }
 
@@ -455,14 +462,29 @@ private class RtpProcessorVideoH264: RtpVideoProcessor {
         }
         let fuIndicator = packet[12]
         let fuHeader = packet[13]
-        let startBit = fuHeader >> 7
+        let startBit = (fuHeader & 0x80) != 0
+        let endBit = (fuHeader & 0x40) != 0
+        guard !(startBit && endBit) else {
+            throw "Invalid FU-A packet with both start and end bits set."
+        }
         let nalType = fuHeader & 0x1F
         let nal = fuIndicator & 0xE0 | nalType
-        if startBit == 1 {
-            decodeFrame()
+        if startBit {
+            if fragmentedFrameStarted {
+                data.removeAll(keepingCapacity: true)
+            } else {
+                decodeFrame()
+            }
             startNewFrame(timestamp: timestamp, first: Data([nal]), second: packet[14...])
+            fragmentedFrameStarted = true
         } else {
+            guard fragmentedFrameStarted else {
+                throw "FU-A packet continuation without start."
+            }
             data += packet[14...]
+            if endBit {
+                fragmentedFrameStarted = false
+            }
         }
     }
 
@@ -483,6 +505,8 @@ private class RtpProcessorVideoH264: RtpVideoProcessor {
 }
 
 private class RtpProcessorVideoH265: RtpVideoProcessor {
+    private var fragmentedFrameStarted = false
+
     override func process(packet: Data, timestamp: Int64) throws {
         guard packet.count >= 14 else {
             throw "Packet shorter than 14 bytes: \(packet)"
@@ -499,7 +523,12 @@ private class RtpProcessorVideoH265: RtpVideoProcessor {
     }
 
     private func processBufferTypeSingle(packet: Data, timestamp: Int64) throws {
-        decodeFrame()
+        if fragmentedFrameStarted {
+            data.removeAll(keepingCapacity: true)
+            fragmentedFrameStarted = false
+        } else {
+            decodeFrame()
+        }
         startNewFrame(timestamp: timestamp, first: packet[12...])
     }
 
@@ -508,14 +537,29 @@ private class RtpProcessorVideoH265: RtpVideoProcessor {
             throw "Packet shorter than 16 bytes: \(packet)"
         }
         let fuHeader = packet[14]
-        let startBit = fuHeader >> 7
+        let startBit = (fuHeader & 0x80) != 0
+        let endBit = (fuHeader & 0x40) != 0
+        guard !(startBit && endBit) else {
+            throw "Invalid FU packet with both start and end bits set."
+        }
         let nalType = fuHeader & 0x3F
         let nal = (packet[12] & 0x81) | (nalType << 1)
-        if startBit == 1 {
-            decodeFrame()
+        if startBit {
+            if fragmentedFrameStarted {
+                data.removeAll(keepingCapacity: true)
+            } else {
+                decodeFrame()
+            }
             startNewFrame(timestamp: timestamp, first: Data([nal, packet[13]]), second: packet[15...])
+            fragmentedFrameStarted = true
         } else {
+            guard fragmentedFrameStarted else {
+                throw "FU packet continuation without start."
+            }
             data += packet[15...]
+            if endBit {
+                fragmentedFrameStarted = false
+            }
         }
     }
 
