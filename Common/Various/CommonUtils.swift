@@ -423,15 +423,11 @@ extension Data {
     }
 
     func getUInt32Be(offset: Int = 0) -> UInt32 {
-        withUnsafeBytes { data in
-            data.load(fromByteOffset: offset, as: UInt32.self)
-        }.bigEndian
+        getFourBytesBe(offset: offset)
     }
 
     func getUInt16Be(offset: Int = 0) -> UInt16 {
-        withUnsafeBytes { data in
-            data.load(fromByteOffset: offset, as: UInt16.self)
-        }.bigEndian
+        UInt16(self[offset]) << 8 | UInt16(self[offset + 1])
     }
 
     func getThreeBytesBe(offset: Int = 0) -> UInt32 {

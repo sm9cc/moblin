@@ -331,3 +331,41 @@ Date: 2026-05-18
   - `swift test`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: high SRTLA shared-code impact, no affected flows.
+
+## Continued sweep 2026-05-18 unaligned packet reads
+
+### Assumptions
+
+- `Data` packet buffers and slices are not guaranteed to be aligned for typed integer loads.
+- Big-endian protocol fields should be decoded byte-by-byte, matching the existing 24-bit and 32-bit helper style.
+- Keep the change limited to read helpers used by packet parsers.
+
+### Acceptance criteria
+
+- 16-bit and 32-bit big-endian reads work at non-zero offsets without typed unaligned loads.
+- Existing big-endian values are unchanged.
+- SRT, SRTLA, RTMP, and MPEG parser callers keep the same helper API.
+
+### Checklist
+
+- [x] Select a high-risk packet helper path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect and add focused tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 16 checks:
+  - Red check: `getUInt16Be` and `getUInt32Be` used typed `UnsafeRawBufferPointer.load` on packet `Data`, which requires aligned memory.
+  - Corpus check: SRT references use explicit network-endian conversion or byte shifts for protocol fields.
+  - Green check: both helpers now assemble values from bytes, matching existing `getThreeBytesBe` and `getFourBytesBe`.
+  - Regression coverage: `UtilsSuite` covers 16-bit and 32-bit big-endian reads at offset 1.
+  - Static check: no typed `load(fromByteOffset: offset, as: UInt16.self)` or `UInt32.self` remains in the helpers.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter UtilsSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: high shared-helper impact, no affected flows.

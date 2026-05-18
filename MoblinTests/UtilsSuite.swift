@@ -98,4 +98,16 @@ struct UtilsSuite {
         let data = Data(repeating: 0xFF, count: 8)
         #expect(data.getInt64Be(offset: 0) == -1)
     }
+
+    @Test
+    func getUInt16BeWithOffset() {
+        let data = Data([0x00, 0x12, 0x34])
+        #expect(data.getUInt16Be(offset: 1) == 0x1234)
+    }
+
+    @Test
+    func getUInt32BeWithOffset() {
+        let data = Data([0x00, 0x12, 0x34, 0x56, 0x78])
+        #expect(data.getUInt32Be(offset: 1) == 0x12345678)
+    }
 }
