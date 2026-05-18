@@ -102,6 +102,7 @@ class WatchModel: NSObject, ObservableObject, @unchecked Sendable {
     private var healthStore = HKHealthStore()
     private var workoutSession: HKWorkoutSession?
     private var workoutBuilder: HKLiveWorkoutBuilder?
+    private var periodicTimer: Timer?
 
     func setup() {
         if WCSession.isSupported() {
@@ -113,10 +114,17 @@ class WatchModel: NSObject, ObservableObject, @unchecked Sendable {
     }
 
     private func startPeriodicTimers() {
-        Timer.scheduledTimer(withTimeInterval: 1, repeats: true, block: { _ in
-            self.updatePreview()
-            self.keepAlive()
+        guard periodicTimer == nil else {
+            return
+        }
+        periodicTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true, block: { [weak self] _ in
+            self?.updatePreview()
+            self?.keepAlive()
         })
+    }
+
+    deinit {
+        periodicTimer?.invalidate()
     }
 
     private func updatePreview() {
