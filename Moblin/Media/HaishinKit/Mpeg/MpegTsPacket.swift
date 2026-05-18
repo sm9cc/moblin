@@ -92,6 +92,12 @@ enum TSTimestamp {
         result |= Int64(data[offset + 4] & 0xFE) >> 1
         return result
     }
+
+    static func hasValidMarkerBits(_ data: Data, offset: Int = 0) -> Bool {
+        (data[offset] & 0x01) == 0x01 &&
+            (data[offset + 2] & 0x01) == 0x01 &&
+            (data[offset + 4] & 0x01) == 0x01
+    }
 }
 
 enum TSProgramClockReference {

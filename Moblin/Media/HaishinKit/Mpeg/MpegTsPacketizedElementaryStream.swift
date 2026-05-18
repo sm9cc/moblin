@@ -54,9 +54,18 @@ struct OptionalHeader {
             guard optionalFields.count >= TSTimestamp.dataSize else {
                 throw "Short PES PTS field"
             }
+            guard TSTimestamp.hasValidMarkerBits(optionalFields) else {
+                throw "Invalid PES PTS marker bits"
+            }
         case 0b11:
             guard optionalFields.count >= 2 * TSTimestamp.dataSize else {
                 throw "Short PES PTS/DTS fields"
+            }
+            guard TSTimestamp.hasValidMarkerBits(optionalFields) else {
+                throw "Invalid PES PTS marker bits"
+            }
+            guard TSTimestamp.hasValidMarkerBits(optionalFields, offset: TSTimestamp.dataSize) else {
+                throw "Invalid PES DTS marker bits"
             }
         default:
             throw "Invalid PES PTS/DTS flags"

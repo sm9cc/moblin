@@ -38,6 +38,31 @@ struct MpegTsPacketizedElementaryStreamSuite {
     }
 
     @Test
+    func rejectsInvalidPtsMarkerBits() {
+        var header = OptionalHeader()
+        header.setTimestamp(CMTime(value: 90_000, timescale: 90_000), .invalid)
+        var data = header.encode()
+        data[3] = data[3] & 0xFE
+        #expect(throws: "Invalid PES PTS marker bits") {
+            try OptionalHeader(data: data)
+        }
+    }
+
+    @Test
+    func rejectsInvalidDtsMarkerBits() {
+        var header = OptionalHeader()
+        header.setTimestamp(
+            CMTime(value: 90_000, timescale: 90_000),
+            CMTime(value: 45_000, timescale: 90_000)
+        )
+        var data = header.encode()
+        data[8] = data[8] & 0xFE
+        #expect(throws: "Invalid PES DTS marker bits") {
+            try OptionalHeader(data: data)
+        }
+    }
+
+    @Test
     func parsesValidPtsField() throws {
         var header = OptionalHeader()
         header.setTimestamp(CMTime(value: 90_000, timescale: 90_000), .invalid)
