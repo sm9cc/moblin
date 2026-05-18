@@ -1233,3 +1233,41 @@ Date: 2026-05-18
   - `swift test --filter AdtsSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.35, no affected flows; review context flags shared ADTS reader impact.
+
+## Continued sweep 2026-05-18 PES scrambling control parsing
+
+### Assumptions
+
+- MPEG-TS PES optional-header bitfields should round-trip by masking the field and then shifting it.
+- The fix should not change timestamp extraction, packet lengths, or payload assembly.
+
+### Acceptance criteria
+
+- `PES_scrambling_control` bits in byte 0 are decoded from bits 4 and 5.
+- Other optional-header fields keep their existing parsing.
+- A focused unit test covers a nonzero scrambling-control field.
+
+### Checklist
+
+- [x] Select high-risk MPEG-TS PES parser path using local code and transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 39 checks:
+  - Red check: `OptionalHeader.init(data:)` decoded `scramblingControl` as `bytes[0] & (0x30 >> 4)`, so the valid `0x30` field decoded as zero.
+  - Corpus check: GStreamer PES parsing documents `PES_scrambling_control` as the two bits covered by `0x30`.
+  - Green check: `OptionalHeader` now masks byte 0 with `0x30` before shifting.
+  - Green check: `MpegTsPacketizedElementaryStreamSuite.parsesScramblingControl` covers a nonzero field.
+  - Scope check: timestamp extraction, packet lengths, and payload assembly are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter MpegTsPacketizedElementaryStreamSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS parser impact.

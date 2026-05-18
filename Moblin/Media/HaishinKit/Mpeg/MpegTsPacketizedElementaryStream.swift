@@ -30,7 +30,7 @@ struct OptionalHeader {
         let reader = ByteReader(data: data)
         let bytes = try reader.readBytes(OptionalHeader.fixedSectionSize)
         markerBits = (bytes[0] & 0b1100_0000) >> 6
-        scramblingControl = bytes[0] & 0b0011_0000 >> 4
+        scramblingControl = (bytes[0] & 0b0011_0000) >> 4
         priority = (bytes[0] & 0b0000_1000) == 0b0000_1000
         dataAlignmentIndicator = (bytes[0] & 0b0000_0100) == 0b0000_0100
         copyright = (bytes[0] & 0b0000_0010) == 0b0000_0010

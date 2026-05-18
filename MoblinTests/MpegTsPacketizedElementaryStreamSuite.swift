@@ -4,6 +4,12 @@ import Testing
 
 struct MpegTsPacketizedElementaryStreamSuite {
     @Test
+    func parsesScramblingControl() throws {
+        let optionalHeader = try OptionalHeader(data: Data([0b1011_0000, 0, 0]))
+        #expect(optionalHeader.scramblingControl == 3)
+    }
+
+    @Test
     func shortPayloadFirstPacketIsFullSize() {
         let stream = MpegTsPacketizedElementaryStream(
             streamId: 0xE0,
