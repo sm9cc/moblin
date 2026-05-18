@@ -341,17 +341,30 @@ class RemoteConnection: @unchecked Sendable {
     }
 
     private func receivePackets() {
-        connection?.batch {
+        guard let connection else {
+            return
+        }
+        connection.batch {
             for index in 0 ..< connectionReceiveBatchSize {
-                connection?.receiveMessage { packet, _, _, error in
-                    if let packet, !packet.isEmpty {
-                        self.handlePacketFromClient(packet: packet)
-                    }
-                    guard index == connectionReceiveBatchSize - 1 else {
+                connection.receiveMessage { [weak self, weak connection] packet, _, _, error in
+                    guard let self,
+                          let connection,
+                          self.connection === connection
+                    else {
                         return
                     }
                     if let error {
                         logger.info("srtla: \(self.typeString): Receive \(error)")
+                        self.reconnect(reason: "Receive \(error)")
+                        return
+                    }
+                    if let packet, !packet.isEmpty {
+                        self.handlePacketFromClient(packet: packet)
+                    }
+                    guard self.connection === connection else {
+                        return
+                    }
+                    guard index == connectionReceiveBatchSize - 1 else {
                         return
                     }
                     self.receivePackets()

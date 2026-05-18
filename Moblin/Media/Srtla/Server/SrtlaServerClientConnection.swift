@@ -39,16 +39,19 @@ class SrtlaServerClientConnection: @unchecked Sendable {
     var latestReceivedTime = ContinuousClock.now
     var delegate: (any SrtlaServerClientConnectionDelegate)?
     private var ackPacket = AckPacket()
+    private var isStopped = false
 
     init(connection: NWConnection) {
         self.connection = connection
     }
 
     func start() {
+        isStopped = false
         receivePackets()
     }
 
     func stop() {
+        isStopped = true
         connection.cancel()
     }
 
@@ -57,17 +60,27 @@ class SrtlaServerClientConnection: @unchecked Sendable {
     }
 
     private func receivePackets() {
+        guard !isStopped else {
+            return
+        }
         connection.batch {
             for index in 0 ..< connectionReceiveBatchSize {
-                connection.receiveMessage { data, _, _, error in
-                    if let data, !data.isEmpty {
-                        self.handlePacketFromClient(packet: data)
-                    }
-                    guard index == connectionReceiveBatchSize - 1 else {
+                connection.receiveMessage { [weak self] data, _, _, error in
+                    guard let self, !self.isStopped else {
                         return
                     }
                     if let error {
                         logger.info("srtla-server-client: Error \(error)")
+                        self.stop()
+                        return
+                    }
+                    if let data, !data.isEmpty {
+                        self.handlePacketFromClient(packet: data)
+                    }
+                    guard !self.isStopped else {
+                        return
+                    }
+                    guard index == connectionReceiveBatchSize - 1 else {
                         return
                     }
                     self.receivePackets()

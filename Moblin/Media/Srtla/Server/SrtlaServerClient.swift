@@ -117,17 +117,27 @@ class SrtlaServerClient: @unchecked Sendable {
     }
 
     private func receivePackets() {
-        localSrtServerConnection?.batch {
+        guard let localSrtServerConnection else {
+            return
+        }
+        let receiveConnection = localSrtServerConnection
+        receiveConnection.batch {
             for index in 0 ..< localSrtServerConnectionReceiveBatchSize {
-                localSrtServerConnection?.receiveMessage { packet, _, _, error in
-                    if let packet, !packet.isEmpty {
-                        self.handlePacketFromLocalSrtServer(packet: packet)
-                    }
-                    guard index == localSrtServerConnectionReceiveBatchSize - 1 else {
+                receiveConnection.receiveMessage { [weak self, weak receiveConnection] packet, _, _, error in
+                    guard let self,
+                          let receiveConnection,
+                          self.localSrtServerConnection === receiveConnection
+                    else {
                         return
                     }
                     if let error {
                         logger.info("srtla-server-client: Receive \(error)")
+                        return
+                    }
+                    if let packet, !packet.isEmpty {
+                        self.handlePacketFromLocalSrtServer(packet: packet)
+                    }
+                    guard index == localSrtServerConnectionReceiveBatchSize - 1 else {
                         return
                     }
                     self.receivePackets()

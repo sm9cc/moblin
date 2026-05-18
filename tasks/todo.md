@@ -1110,3 +1110,46 @@ Date: 2026-05-18
   - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: medium working-tree risk, low review-context risk, no affected flows; reported existing private SRT/SRTLA test gaps.
+
+## Continued sweep 2026-05-18 SRTLA batched receive errors
+
+### Assumptions
+
+- Each batched `NWConnection.receiveMessage` callback can complete independently with an error.
+- A receive error should stop that receive batch from scheduling more reads.
+- Old connection callbacks should not schedule reads on a replacement connection after stop or reconnect.
+
+### Acceptance criteria
+
+- SRTLA client and server batched receive loops handle an error in any callback, not only the final callback.
+- SRTLA client receive errors trigger reconnect through the existing reconnect path.
+- SRTLA server local-SRT callbacks from an old local connection are ignored after stop/replacement.
+- SRTLA per-link server connections stop scheduling receive batches after stop or receive error.
+
+### Checklist
+
+- [x] Select high-risk SRTLA receive lifecycle path.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 36 checks:
+  - Red check: `RemoteConnection.receivePackets`, `SrtlaServerClient.receivePackets`, and `SrtlaServerClientConnection.receivePackets` only checked `error` when the final receive callback in a batch ran.
+  - Red check: callbacks from old SRTLA connections could still schedule another receive batch after stop or reconnect.
+  - Corpus check: BELABOX/OpenIRL SRTLA receive loops handle each socket read result immediately; they do not defer error handling to the end of a synthetic batch.
+  - Green check: all three batched receive loops now handle any callback error before packet processing or rescheduling.
+  - Green check: `RemoteConnection` reconnects through the existing reconnect path on receive error and ignores stale callbacks from old `NWConnection` instances.
+  - Green check: `SrtlaServerClientConnection` marks itself stopped and cancels its connection on receive error, so later callbacks cannot reschedule reads.
+  - Scope check: SRTLA packet parsing, registration, ACK generation, and send scheduling are unchanged.
+  - Test gap: batched `NWConnection.receiveMessage` callback timing requires Network.framework runtime coverage; no new unit test was added.
+  - `git diff --check`: pass.
+  - whole-file line-width scan found an existing 111-character line in `SrtlaServerClient.swift`; changed lines were manually reviewed for width.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: medium working-tree risk, low review-context risk, no affected flows; reported existing private SRTLA receive test gaps.
