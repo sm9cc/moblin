@@ -1067,3 +1067,46 @@ Date: 2026-05-18
   - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: medium working-tree risk with no affected flows; reported existing private SRT sender test gaps.
+
+## Continued sweep 2026-05-18 SRTLA data batch flushing
+
+### Assumptions
+
+- SRTLA data packets may still be batched briefly for local efficiency.
+- A partial data batch must not wait forever for another packet.
+- Control packets must not pass earlier queued data packets on the same SRTLA link.
+
+### Acceptance criteria
+
+- SRTLA client and server data batches flush after a bounded idle timeout.
+- SRTLA client and server flush pending data before sending control packets.
+- Stop/reconnect paths clear pending data batches instead of carrying stale packets to a later connection.
+- Existing batch-size flush behavior remains.
+
+### Checklist
+
+- [x] Select high-risk SRTLA data forwarding path using local code and SRTLA corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 35 checks:
+  - Red check: server-side SRTLA data batches flushed only when another data packet arrived after 25 ms, so a short burst could sit indefinitely.
+  - Red check: client-side SRTLA data batches had the same idle-burst risk and could survive reconnect until later data flushed them.
+  - Red check: both paths could send a control packet while earlier data packets were still queued locally.
+  - Corpus check: BELABOX, OpenIRL, and Go SRTLA references forward SRT packets immediately to the next hop and do not let control forwarding overtake queued data.
+  - Green check: server-side local SRT forwarding now flushes a partial data batch after 25 ms, before control packets, and clears pending data on stop.
+  - Green check: client-side remote forwarding now flushes a partial data batch after 15 ms, before control packets, and clears pending data on reconnect/stop.
+  - Scope check: connection scoring, packet selection, SRTLA registration, and ACK/NAK packet formats are unchanged.
+  - Test gap: this path depends on `NWConnection` UDP send timing; no new unit test was added.
+  - `git diff --check`: pass.
+  - whole-file line-width scan found an existing 111-character line in `SrtlaServerClient.swift`; changed lines were manually reviewed for width.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: medium working-tree risk, low review-context risk, no affected flows; reported existing private SRT/SRTLA test gaps.

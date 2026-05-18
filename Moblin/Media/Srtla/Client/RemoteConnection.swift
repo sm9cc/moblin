@@ -6,6 +6,7 @@ import Foundation
 import Network
 
 private let connectionReceiveBatchSize = 25
+private let dataPacketsFlushTimeout = 0.015
 
 private enum State {
     case idle
@@ -46,6 +47,7 @@ class RemoteConnection: @unchecked Sendable {
 
     private var connectTimer = SimpleTimer(queue: srtlaClientQueue)
     private var keepaliveTimer = SimpleTimer(queue: srtlaClientQueue)
+    private var dataPacketsFlushTimer = SimpleTimer(queue: srtlaClientQueue)
     private var latestReceivedTime = ContinuousClock.now
     private var packetsInFlight: Set<UInt32> = []
     private var windowSize: Int = 0
@@ -154,6 +156,7 @@ class RemoteConnection: @unchecked Sendable {
         connection?.forceCancel()
         connection = nil
         cancelAllTimers()
+        dataPacketsToSend.removeAll()
         state = .idle
     }
 
@@ -189,6 +192,7 @@ class RemoteConnection: @unchecked Sendable {
     }
 
     func flushDataPackets() {
+        dataPacketsFlushTimer.stop()
         if !dataPacketsToSend.isEmpty {
             sendDataPackets()
         }
@@ -274,6 +278,7 @@ class RemoteConnection: @unchecked Sendable {
     private func cancelAllTimers() {
         keepaliveTimer.stop()
         connectTimer.stop()
+        dataPacketsFlushTimer.stop()
     }
 
     private func isMoblink() -> Bool {
@@ -374,6 +379,7 @@ class RemoteConnection: @unchecked Sendable {
                 totalDataSentByteCount += UInt64(packet.count)
             }
         } else {
+            flushDataPackets()
             sendControlPacketInternal(packet: packet)
         }
     }
@@ -384,8 +390,13 @@ class RemoteConnection: @unchecked Sendable {
 
     private func sendDataPacketInternal(packet: Data) {
         dataPacketsToSend.append(packet)
+        if dataPacketsToSend.count == 1 {
+            dataPacketsFlushTimer.startSingleShot(timeout: dataPacketsFlushTimeout) { [weak self] in
+                self?.flushDataPackets()
+            }
+        }
         if dataPacketsToSend.count > 15 {
-            sendDataPackets()
+            flushDataPackets()
         }
     }
 

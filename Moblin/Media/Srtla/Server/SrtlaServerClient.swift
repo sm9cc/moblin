@@ -7,6 +7,7 @@ import Network
 
 private let clientRemoveTimeout = 10.0
 private let localSrtServerConnectionReceiveBatchSize = 25
+private let localSrtServerDataPacketsFlushTimeout = 0.025
 
 private class NakPacket {
     private var sns: [UInt32] = []
@@ -65,8 +66,8 @@ class SrtlaServerClient: @unchecked Sendable {
     let createdAt: ContinuousClock.Instant = .now
     private var nakPacket = NakPacket()
     private var periodicNakTimer = SimpleTimer(queue: srtlaServerQueue)
+    private var dataPacketsFlushTimer = SimpleTimer(queue: srtlaServerQueue)
     private var dataPacketsToSend: [Data] = []
-    private var latestFlushDataPacketsTime = ContinuousClock.now
 
     init(srtPort: UInt16) {
         logger.info("srtla-server-client: Creating local SRT server connection.")
@@ -76,6 +77,8 @@ class SrtlaServerClient: @unchecked Sendable {
 
     func stop() {
         stopPeriodicNakTimer()
+        dataPacketsFlushTimer.stop()
+        dataPacketsToSend.removeAll()
         localSrtServerConnection?.cancel()
         localSrtServerConnection = nil
     }
@@ -194,6 +197,25 @@ class SrtlaServerClient: @unchecked Sendable {
         }
     }
 
+    private func scheduleDataPacketsFlush() {
+        dataPacketsFlushTimer.startSingleShot(timeout: localSrtServerDataPacketsFlushTimeout) { [weak self] in
+            self?.flushDataPackets()
+        }
+    }
+
+    private func flushDataPackets() {
+        dataPacketsFlushTimer.stop()
+        guard !dataPacketsToSend.isEmpty else {
+            return
+        }
+        localSrtServerConnection?.batch {
+            for packet in dataPacketsToSend {
+                localSrtServerConnection?.send(content: packet, completion: .idempotent)
+            }
+        }
+        dataPacketsToSend.removeAll()
+    }
+
     func handlePeriodicTimer() -> Bool {
         let now = ContinuousClock.now
         var index = 0
@@ -217,17 +239,14 @@ extension SrtlaServerClient: SrtlaServerClientConnectionDelegate {
         if isSrtDataPacket(packet: packet) {
             nakPacket.remove(sn: getSrtSequenceNumber(packet: packet))
             dataPacketsToSend.append(packet)
-            let now = ContinuousClock.now
-            if latestFlushDataPacketsTime.duration(to: now) > .milliseconds(25) {
-                localSrtServerConnection?.batch {
-                    for packet in dataPacketsToSend {
-                        localSrtServerConnection?.send(content: packet, completion: .idempotent)
-                    }
-                }
-                dataPacketsToSend.removeAll()
-                latestFlushDataPacketsTime = now
+            if dataPacketsToSend.count == 1 {
+                scheduleDataPacketsFlush()
+            }
+            if dataPacketsToSend.count > 15 {
+                flushDataPackets()
             }
         } else {
+            flushDataPackets()
             localSrtServerConnection?.send(content: packet, completion: .idempotent)
         }
         latestConnection = connection
