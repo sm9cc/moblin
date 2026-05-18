@@ -47,6 +47,11 @@ struct MpegTsPacketizedElementaryStreamSuite {
     }
 
     @Test
+    func encodesProgramClockReferenceExtensionHighBit() {
+        #expect(TSProgramClockReference.encode(0, 0x0100) == Data([0, 0, 0, 0, 0x7F, 0]))
+    }
+
+    @Test
     func shortPayloadFirstPacketIsFullSize() {
         let stream = MpegTsPacketizedElementaryStream(
             streamId: 0xE0,

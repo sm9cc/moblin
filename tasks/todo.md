@@ -1311,6 +1311,45 @@ Date: 2026-05-18
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS parser impact.
 
+## Continued sweep 2026-05-18 PCR extension encoding
+
+### Assumptions
+
+- MPEG-TS PCR byte 4 carries the PCR base low bit, six reserved bits set to one, and the PCR extension high bit.
+- `TSProgramClockReference.encode` should encode the low nine bits of the extension argument.
+- The current caller still passes extension zero, but the shared encoder should be correct for valid nonzero PCR extensions.
+
+### Acceptance criteria
+
+- PCR extension bit 8 is reflected in encoded byte 4.
+- Existing PCR base-bit and reserved-bit behavior stays unchanged.
+- A focused unit test covers a nonzero PCR extension high bit.
+
+### Checklist
+
+- [x] Select high-risk MPEG-TS PCR timestamp encoder path using local code and transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 42 checks:
+  - Red check: `TSProgramClockReference.encode` tested the low bit of an already encoded byte, so PCR extension bit 8 was never written.
+  - Corpus check: FFmpeg encodes PCR byte 4 as `pcr_high << 7 | pcr_low >> 8 | 0x7e`; GStreamer encodes `((pcr_ext >> 8) & 0x01)` into the same bit.
+  - Green check: PCR extension bit 8 is now copied from `(e & 0x0100)` into encoded byte 4.
+  - Green check: `MpegTsPacketizedElementaryStreamSuite.encodesProgramClockReferenceExtensionHighBit` covers the nonzero high-bit case.
+  - Scope check: packet headers, payload sizing, PES assembly, and current extension-zero caller behavior are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter MpegTsPacketizedElementaryStreamSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS packet impact.
+
 ## Continued sweep 2026-05-18 PES timestamp field validation
 
 ### Assumptions

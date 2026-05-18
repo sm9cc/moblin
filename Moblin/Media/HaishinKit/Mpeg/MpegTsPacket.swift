@@ -107,7 +107,7 @@ enum TSProgramClockReference {
         } else {
             encoded[4] &= 0x7F
         }
-        if UInt16(encoded[4] & 0x01) >> 8 == 1 {
+        if (e & 0x0100) == 0x0100 {
             encoded[4] |= 1
         } else {
             encoded[4] &= 0xFE
