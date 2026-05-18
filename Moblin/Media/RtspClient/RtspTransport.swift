@@ -87,8 +87,13 @@ class RtspTransportRtpRtspTcp: RtspTransport, @unchecked Sendable {
         guard let match = value.firstMatch(of: /interleaved=(\d+)-(\d+)/) else {
             throw "Invalid interleaving in \(value)."
         }
-        rtpChannel = UInt8(match.output.1)
-        rtcpChannel = UInt8(match.output.2)
+        guard let rtpChannel = UInt8(match.output.1),
+              let rtcpChannel = UInt8(match.output.2)
+        else {
+            throw "Invalid interleaving channels in \(value)."
+        }
+        self.rtpChannel = rtpChannel
+        self.rtcpChannel = rtcpChannel
     }
 
     private func receiveMessage() {

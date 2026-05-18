@@ -4,6 +4,20 @@ import Testing
 
 struct RtspClientSuite {
     @Test
+    func tcpTransportAcceptsValidInterleavedChannels() throws {
+        let transport = RtspTransportRtpRtspTcp()
+        try transport.handleSetupTransportResponse("RTP/AVP/TCP;unicast;interleaved=0-1")
+    }
+
+    @Test
+    func tcpTransportRejectsInvalidInterleavedChannels() {
+        let transport = RtspTransportRtpRtspTcp()
+        #expect(throws: "Invalid interleaving channels in RTP/AVP/TCP;unicast;interleaved=256-257.") {
+            try transport.handleSetupTransportResponse("RTP/AVP/TCP;unicast;interleaved=256-257")
+        }
+    }
+
+    @Test
     func normalizeRtpPacketSkipsCsrcAndExtension() throws {
         let packet = Data([
             0x91, 0x60, 0x00, 0x02, 0x00, 0x00, 0x00, 0x10,

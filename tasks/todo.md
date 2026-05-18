@@ -597,3 +597,41 @@ Date: 2026-05-18
   - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: low RTSP delegate impact, no affected flows, no reported test gaps.
+
+## Continued sweep 2026-05-18 RTSP TCP interleaved channel validation
+
+### Assumptions
+
+- RTSP/TCP setup responses must provide numeric RTP and RTCP interleaved channels.
+- Channels outside the one-byte interleaved frame header cannot be represented by Moblin's TCP transport.
+- Rejecting an invalid setup response is safer than silently setting nil channels and dropping media.
+
+### Acceptance criteria
+
+- Valid `interleaved=0-1` setup responses still parse.
+- Out-of-range TCP interleaved channels throw during setup response handling.
+- RTP and RTCP channel assignment only happens after both values are valid.
+
+### Checklist
+
+- [x] Select a high-risk RTSP setup parser path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Add focused parser tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 23 checks:
+  - Red check: `RtspTransportRtpRtspTcp.handleSetupTransportResponse()` silently assigned nil RTP or RTCP channels when `interleaved=` values exceeded `UInt8`.
+  - Corpus check: FFmpeg and GStreamer generate explicit RTP/RTCP interleaved channel pairs for RTSP/TCP setup.
+  - Green check: both parsed interleaved channel values must now fit the one-byte RTSP interleaved frame header before assignment.
+  - Regression coverage: `RtspClientSuite` covers a valid `interleaved=0-1` response and rejects `interleaved=256-257`.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: low RTSP parser impact, no affected flows; reported test gap despite the focused parser tests.
