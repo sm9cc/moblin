@@ -57,4 +57,19 @@ struct AdaptiveBitrateSuite {
         #expect(belabox.getCurrentBitrate() == 2_000_000)
         #expect(handler.bitrates.last == 2_000_000)
     }
+
+    @Test
+    func belaboxIgnoresMissingSendRate() {
+        let handler = Handler()
+        let belabox = AdaptiveBitrateSrtBelabox(targetBitrate: 5_000_000, delegate: handler)
+        belabox.setSettings(settings: adaptiveBitrateBelaboxSettings)
+        belabox.update(stats: StreamStats(rttMs: 30,
+                                          packetsInFlight: 15,
+                                          transportBitrate: 5_000_000,
+                                          latency: 3000,
+                                          mbpsSendRate: nil,
+                                          relaxed: false))
+        #expect(belabox.getCurrentBitrate() == 1_000_000)
+        #expect(handler.bitrates.isEmpty)
+    }
 }

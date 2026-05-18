@@ -176,3 +176,43 @@ Date: 2026-05-18
   - `swift`: unavailable in this shell.
   - `xcodebuild`: unavailable in this shell.
   - Unrelated/unowned working tree item left alone: `.idea/`.
+
+## Continued sweep 2026-05-18
+
+### Assumptions
+
+- Continue on `fix/project-hardening-pass`.
+- Keep fixes surgical and commit one confirmed defect at a time.
+- Use `/home/michael/Development/Research/transport-reference-corpus/` for protocol and media reference checks when touching transport, codec, media, adaptive bitrate, or recovery logic.
+- Leave unrelated `.idea/` and unowned instruction-file state alone.
+
+### Acceptance criteria
+
+- Each fix has a concrete failure mode and root cause.
+- Each fix changes only the affected path and matching tests or generated artifacts when required.
+- Each fix is validated with the smallest relevant check first, then broader available checks.
+- Each fix is reviewed before commit and committed separately with a normal descriptive message.
+
+### Checklist
+
+- [x] Select a high-risk transport or media path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect and add or update focused tests when feasible.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 12 checks:
+  - Red check: `AdaptiveBitrateSrtBelabox.updateBitrate` force-unwrapped optional `stats.mbpsSendRate`.
+  - Corpus check: Belacoder reference uses `stats->mbpsSendRate` to update throughput, so missing send-rate samples are incomplete inputs.
+  - Green check: Belabox update now skips missing send-rate samples before mutating rolling bitrate state.
+  - Regression coverage: `belaboxIgnoresMissingSendRate` sends `mbpsSendRate: nil` and expects no bitrate change or delegate update.
+  - Static check: no `stats.mbpsSendRate!` remains in adaptive bitrate code or tests.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: unavailable in this shell.
+  - code-review-graph: high shared-code impact, no affected flows.

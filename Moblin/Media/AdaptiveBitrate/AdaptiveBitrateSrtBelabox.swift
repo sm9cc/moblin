@@ -116,6 +116,9 @@ class AdaptiveBitrateSrtBelabox: AdaptiveBitrate {
         if stats.rttMs == 0 {
             return
         }
+        guard let mbpsSendRate = stats.mbpsSendRate else {
+            return
+        }
         let sendBufferSize = stats.packetsInFlight
         updateSendBufferSizeAverage(sendBufferSize: sendBufferSize)
         updateSendBufferSizeJitter(sendBufferSize: sendBufferSize)
@@ -124,7 +127,7 @@ class AdaptiveBitrateSrtBelabox: AdaptiveBitrate {
         let deltaRtt = updateAverageRttDelta(rtt: rtt)
         updateRttMin(rtt: rtt)
         updateRttJitter(deltaRtt: deltaRtt)
-        updateThroughput(mbpsSendRate: stats.mbpsSendRate!)
+        updateThroughput(mbpsSendRate: mbpsSendRate)
         let srtLatency = Double(stats.latency ?? defaultSrtLatency)
         let currentTime = ContinuousClock.now
         var bitrate = currentBitrate
