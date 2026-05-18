@@ -323,17 +323,25 @@ class RtmpServerClient: @unchecked Sendable {
     }
 
     private func receiveDataFromNetwork() {
+        guard connectionState != .idle else {
+            return
+        }
         connection.receive(minimumIncompleteLength: receiveSize, maximumLength: max(
             receiveSize,
             8192
-        )) { data, _, _, error in
+        )) { data, _, isComplete, error in
             if let data {
                 self.processReceivedData(data: data)
-                self.receiveDataFromNetwork()
             }
             if let error {
                 self.stopInternal(reason: "Error \(error)")
+                return
             }
+            if isComplete {
+                self.stopInternal(reason: "Connection closed")
+                return
+            }
+            self.receiveDataFromNetwork()
         }
     }
 
@@ -346,7 +354,7 @@ class RtmpServerClient: @unchecked Sendable {
         isProcessing = true
         var offset = 0
         inputBuffer.withUnsafeMutableBytes { inputBuffer in
-            while inputBuffer.count - offset >= self.receiveSize {
+            while self.connectionState != .idle, inputBuffer.count - offset >= self.receiveSize {
                 let data = Data(
                     bytesNoCopy: inputBuffer.baseAddress! + offset,
                     count: self.receiveSize,
@@ -356,8 +364,11 @@ class RtmpServerClient: @unchecked Sendable {
                 self.handleData(data: data)
             }
         }
+        if connectionState == .idle {
+            offset = inputBuffer.count
+        }
         inputBuffer = inputBuffer.advanced(by: offset)
-        if totalBytesReceived - totalBytesReceivedAcked > windowAcknowledgementSize {
+        if connectionState != .idle, totalBytesReceived - totalBytesReceivedAcked > windowAcknowledgementSize {
             sendAck()
             totalBytesReceivedAcked = totalBytesReceived
         }

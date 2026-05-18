@@ -908,3 +908,41 @@ Date: 2026-05-18
   - `swift test --filter RtmpStreamSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: low working-tree risk with no affected flows; reported static test gaps for the changed RTMP chunk entities despite the focused test.
+
+## Continued sweep 2026-05-18 RTMP stopped client receive loop
+
+### Assumptions
+
+- Once an RTMP client is stopped and moved to idle, buffered bytes from that client should be discarded.
+- A stopped RTMP client should not schedule another `NWConnection.receive`.
+- EOF from `NWConnection.receive` should stop the client instead of waiting for the periodic timeout.
+
+### Acceptance criteria
+
+- `receiveDataFromNetwork` returns immediately for idle clients.
+- A receive callback does not schedule another receive after an error, EOF, or stop during buffered processing.
+- Buffered parsing stops once `stopInternal` idles the client.
+- ACK messages are not sent after the client has been stopped.
+
+### Checklist
+
+- [x] Select a high-risk RTMP receive lifecycle path.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 31 checks:
+  - Red check: the RTMP receive callback always scheduled another receive after processing data, even if processing stopped and idled the client.
+  - Red check: buffered parsing continued through any remaining bytes after `stopInternal` canceled the connection, and ACK sending could still run after stop.
+  - Green check: idle clients no longer schedule receives, EOF stops the client immediately, buffered parsing exits once the client is idle, and ACK sending is skipped after stop.
+  - Test gap: this path depends on `NWConnection.receive` callback timing and buffered network delivery; no new unit test was added.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtmpStreamSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: low working-tree risk with no affected flows; reported expected test gaps for the private receive loop.
