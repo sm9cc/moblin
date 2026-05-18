@@ -2,6 +2,7 @@ import Foundation
 
 let srtControlPacketTypeBit: UInt16 = 0x8000
 let srtControlTypeSize = 2
+let srtSequenceNumberSize = 4
 
 enum SrtPacketType: UInt16 {
     case handshake = 0x0000
@@ -16,7 +17,7 @@ enum SrtPacketType: UInt16 {
 }
 
 func isSrtDataPacket(packet: Data) -> Bool {
-    (packet[0] & 0x80) == 0
+    packet.count >= srtSequenceNumberSize && (packet[0] & 0x80) == 0
 }
 
 func getSrtControlPacketType(packet: Data) -> UInt16 {

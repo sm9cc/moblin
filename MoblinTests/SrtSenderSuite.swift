@@ -36,6 +36,15 @@ extension ModelMock: SrtSenderDelegate {
 
 struct SrtSenderSuite {
     @Test
+    func shortPacketsAreNotDataPackets() {
+        #expect(!isSrtDataPacket(packet: Data()))
+        #expect(!isSrtDataPacket(packet: Data([0x00])))
+        #expect(!isSrtDataPacket(packet: Data([0x00, 0x00, 0x00])))
+        #expect(isSrtDataPacket(packet: Data([0x00, 0x00, 0x00, 0x00])))
+        #expect(!isSrtDataPacket(packet: Data([0x80, 0x00, 0x00, 0x00])))
+    }
+
+    @Test
     func connectDisconnect() async throws {
         let sender = SrtSender(streamId: "1234", latency: 2000, experimental: false)
         let model = ModelMock()
