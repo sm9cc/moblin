@@ -34,30 +34,21 @@ func addNalUnitStartCodes(_ data: inout Data) {
 
 // Should unescape as well?
 func removeNalUnitStartCodes(_ data: inout Data, _ nalUnits: [NalUnitInfo]) {
-    var numberOfThreeBytesStartCodes = nalUnits.count(where: { $0.startCodeLength != 4 })
+    let numberOfThreeBytesStartCodes = nalUnits.count(where: { $0.startCodeLength != 4 })
     if numberOfThreeBytesStartCodes == 0 {
         for nalUnit in nalUnits {
             data.replaceSubrange(nalUnit.startCodeOffset ..< nalUnit.startCodeOffset + 4,
                                  with: Int32(nalUnit.dataLength).bigEndian.data)
         }
     } else {
-        data += Data(count: numberOfThreeBytesStartCodes)
-        var endOffset = data.count
-        for nalUnit in nalUnits {
+        var converted = Data()
+        converted.reserveCapacity(data.count + numberOfThreeBytesStartCodes)
+        for nalUnit in nalUnits.reversed() {
             let dataOffset = nalUnit.dataOffset()
-            if numberOfThreeBytesStartCodes > 0 {
-                // Require iOS 18 and later for now.
-                if #available(iOS 18, *) {
-                    data.moveSubranges(.init(dataOffset ..< dataOffset + nalUnit.dataLength), to: endOffset)
-                }
-            }
-            endOffset -= nalUnit.dataLength
-            data.replaceSubrange(endOffset - 4 ..< endOffset, with: Int32(nalUnit.dataLength).bigEndian.data)
-            endOffset -= 4
-            if nalUnit.startCodeLength != 4 {
-                numberOfThreeBytesStartCodes -= 1
-            }
+            converted += Int32(nalUnit.dataLength).bigEndian.data
+            converted += data.subdata(in: dataOffset ..< dataOffset + nalUnit.dataLength)
         }
+        data = converted
     }
 }
 

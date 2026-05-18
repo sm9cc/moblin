@@ -1601,3 +1601,46 @@ Date: 2026-05-18
   - `swift test --filter MpegTsPacketizedElementaryStreamSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS parser impact.
+
+## Continued sweep 2026-05-18 NAL start-code conversion
+
+### Assumptions
+
+- Annex B H.264 and H.265 access units can contain three-byte or four-byte start codes.
+- Moblin converts Annex B input to four-byte length-prefixed NAL units for the WebRTC and MPEG-TS
+  decode paths.
+- Main app targets include iOS 16.4, so conversion must not depend on iOS 18-only `Data` movement.
+
+### Acceptance criteria
+
+- All three-byte Annex B start codes convert to four-byte big-endian NAL length prefixes.
+- Mixed three-byte and four-byte start-code samples keep their original NAL order and payload bytes.
+- Existing all-four-byte start-code conversion keeps its current in-place path.
+
+### Checklist
+
+- [x] Select high-risk NAL conversion path using local code and transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Add focused regression tests.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 46 checks:
+  - Red check: `removeNalUnitStartCodes` only moved payload bytes on iOS 18 and later when any NAL used a three-byte start code.
+  - Target check: `Moblin.xcodeproj` still has main app deployment targets at iOS 16.4.
+  - Corpus check: FFmpeg converts Annex B NAL start-code prefixes into four-byte size fields for MP4-style packetized data, and GStreamer AVC parsing reads NAL length prefixes.
+  - Green check: mixed-prefix samples now rebuild into four-byte length-prefixed NAL units without `Data.moveSubranges`.
+  - Green check: `RtspClientSuite` covers all-three-byte and mixed three-byte/four-byte start-code conversion.
+  - Static check: no `moveSubranges`, `#available(iOS 18`, or iOS 18-only comment remains in `NalUnitStream`.
+  - Python reproduction of the parser/converter logic returned `[True, True]` for the two regression cases.
+  - `git diff --check`: pass.
+  - line-width scan for changed lines: pass; whole-file scan still reports pre-existing `RtspClientSuite.swift:143`.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.35, no affected flows; review context flags shared NAL conversion impact.

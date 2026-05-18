@@ -91,6 +91,36 @@ struct RtspClientSuite {
     }
 
     @Test
+    func removeNalUnitStartCodesConvertsThreeByteStartCodes() {
+        var data = Data([
+            0x00, 0x00, 0x01, 0x65, 0xAA,
+            0x00, 0x00, 0x01, 0x41, 0xBB, 0xCC,
+        ])
+
+        removeNalUnitStartCodes(&data, getNalUnits(data: data))
+
+        #expect(data == Data([
+            0x00, 0x00, 0x00, 0x02, 0x65, 0xAA,
+            0x00, 0x00, 0x00, 0x03, 0x41, 0xBB, 0xCC,
+        ]))
+    }
+
+    @Test
+    func removeNalUnitStartCodesConvertsMixedStartCodes() {
+        var data = Data([
+            0x00, 0x00, 0x00, 0x01, 0x67,
+            0x00, 0x00, 0x01, 0x68, 0x99,
+        ])
+
+        removeNalUnitStartCodes(&data, getNalUnits(data: data))
+
+        #expect(data == Data([
+            0x00, 0x00, 0x00, 0x01, 0x67,
+            0x00, 0x00, 0x00, 0x02, 0x68, 0x99,
+        ]))
+    }
+
+    @Test
     func makeSetupUrlAddsSeparatorForRelativeControl() throws {
         let url = try makeRtspSetupUrl(baseUrl: "rtsp://example.com/live", controlUrl: "trackID=1")
         #expect(url?.absoluteString == "rtsp://example.com/live/trackID=1")
