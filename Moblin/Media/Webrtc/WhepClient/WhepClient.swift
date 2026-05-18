@@ -143,6 +143,12 @@ class WhepClient: @unchecked Sendable {
     }
 
     private func handleOfferResponse(data: Data?, response: URLResponse?, error: (any Error)?) {
+        guard started else {
+            if let sessionUrl = makeSessionUrl(response: response) {
+                sendDeleteRequest(url: sessionUrl)
+            }
+            return
+        }
         guard error == nil,
               let response = response?.http,
               response.isSuccessful,
@@ -153,9 +159,7 @@ class WhepClient: @unchecked Sendable {
             reconnectSoon()
             return
         }
-        if let locationHeader = response.value(forHTTPHeaderField: "Location") {
-            sessionUrl = URL(string: locationHeader, relativeTo: url)
-        }
+        sessionUrl = makeSessionUrl(response: response)
         logger.debug("whep-client: \(streamId): Got answer \(answer)")
         do {
             try ingestClient?.setRemoteDescription(answer, type: "answer")
@@ -163,6 +167,16 @@ class WhepClient: @unchecked Sendable {
             logger.info("whep-client: \(streamId): Failed to set remote answer: \(error)")
             reconnectSoon()
         }
+    }
+
+    private func makeSessionUrl(response: URLResponse?) -> URL? {
+        guard let response = response?.http,
+              response.isSuccessful,
+              let locationHeader = response.value(forHTTPHeaderField: "Location")
+        else {
+            return nil
+        }
+        return URL(string: locationHeader, relativeTo: url)
     }
 
     private func sendDeleteRequest(url: URL) {
