@@ -3,6 +3,7 @@ import Foundation
 let srtControlPacketTypeBit: UInt16 = 0x8000
 let srtControlTypeSize = 2
 let srtSequenceNumberSize = 4
+let srtNakMaximumSequenceNumbers = 1300 / 4
 
 enum SrtPacketType: UInt16 {
     case handshake = 0x0000
@@ -42,6 +43,15 @@ func isSrtSnRange(sn: UInt32) -> Bool {
 
 func processSrtNak(packet: Data, onNak: (UInt32) -> Void) {
     var offset = 16
+    var sequenceNumbers = 0
+    func processSn(_ sn: UInt32) -> Bool {
+        guard sequenceNumbers < srtNakMaximumSequenceNumbers else {
+            return false
+        }
+        onNak(sn)
+        sequenceNumbers += 1
+        return true
+    }
     while offset <= packet.count - 4 {
         let nakSn = packet.getUInt32Be(offset: offset)
         offset += 4
@@ -50,12 +60,21 @@ func processSrtNak(packet: Data, onNak: (UInt32) -> Void) {
                 return
             }
             let upToNakSn = packet.getUInt32Be(offset: offset)
-            for sn in stride(from: nakSn & 0x7FFF_FFFF, through: upToNakSn, by: 1) {
-                onNak(sn)
+            var sn = nakSn & 0x7FFF_FFFF
+            while sn <= upToNakSn {
+                guard processSn(sn) else {
+                    return
+                }
+                if sn == upToNakSn {
+                    break
+                }
+                sn += 1
             }
             offset += 4
         } else {
-            onNak(nakSn)
+            guard processSn(nakSn) else {
+                return
+            }
         }
     }
 }

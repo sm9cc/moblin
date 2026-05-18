@@ -45,6 +45,29 @@ struct SrtSenderSuite {
     }
 
     @Test
+    func processSrtNakRange() {
+        let packet = createSrtNakPacket([0x8000_0001, 0x0000_0003])
+        var sns: [UInt32] = []
+        processSrtNak(packet: packet) { sn in
+            sns.append(sn)
+        }
+        #expect(sns == [1, 2, 3])
+    }
+
+    @Test
+    func processSrtNakLargeRangeIsBounded() {
+        let packet = createSrtNakPacket([0x8000_0001, UInt32(srtNakMaximumSequenceNumbers + 100)])
+        var count = 0
+        var lastSn: UInt32 = 0
+        processSrtNak(packet: packet) { sn in
+            count += 1
+            lastSn = sn
+        }
+        #expect(count == srtNakMaximumSequenceNumbers)
+        #expect(lastSn == UInt32(srtNakMaximumSequenceNumbers))
+    }
+
+    @Test
     func connectDisconnect() async throws {
         let sender = SrtSender(streamId: "1234", latency: 2000, experimental: false)
         let model = ModelMock()
@@ -75,6 +98,14 @@ struct SrtSenderSuite {
         80000000000000000000000000000000000000040000000200000fe6000005dc\
         00002000000000012ab1f77c000000000100007f000000000000000000000000
         """)
+    }
+
+    private func createSrtNakPacket(_ values: [UInt32]) -> Data {
+        var packet = Data(count: 16 + values.count * 4)
+        for (index, value) in values.enumerated() {
+            packet.setUInt32Be(value: value, offset: 16 + index * 4)
+        }
+        return packet
     }
 
     private func checkConclusionHandshake(packet: String) -> (UInt32, UInt32) {

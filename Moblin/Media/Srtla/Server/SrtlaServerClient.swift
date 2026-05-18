@@ -51,7 +51,7 @@ private class NakPacket {
         writer.writeUInt32(0)
         writer.writeUInt32(latestNakTimestamp)
         writer.writeUInt32(latestNakDestinationSrtSocketId)
-        for sn in sns.prefix(1300 / 4) {
+        for sn in sns.prefix(srtNakMaximumSequenceNumbers) {
             writer.writeUInt32(sn)
         }
         return writer.data

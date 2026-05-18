@@ -407,3 +407,42 @@ Date: 2026-05-18
   - `swift test --filter UtilsSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: high shared-helper impact, no affected flows.
+
+## Continued sweep 2026-05-18 SRT NAK range bounds
+
+### Assumptions
+
+- Moblin still handles NAKs through per-sequence callbacks.
+- A compressed SRT loss range must not expand into unbounded CPU or memory work.
+- Preserve existing packet parsing and cap only the amount of expanded NAK work.
+
+### Acceptance criteria
+
+- Normal single-sequence and small range NAK packets keep their existing callbacks.
+- A very large range stops after the same sequence-count budget used for emitted NAK packets.
+- Malformed or hostile NAK input cannot force millions of loop iterations.
+
+### Checklist
+
+- [x] Select a high-risk SRT NAK parser path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect and add focused tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 18 checks:
+  - Red check: `processSrtNak` expanded compressed ranges with no bound, so a hostile range could force millions of callbacks.
+  - Corpus check: SRT validates loss report ranges against sender state before inserting them into bounded loss lists.
+  - Green check: Moblin keeps the existing per-sequence callback API but stops expansion at `srtNakMaximumSequenceNumbers`.
+  - Consistency check: `NakPacket.pack()` now uses the same sequence-count budget when emitting NAK packets.
+  - Regression coverage: `SrtSenderSuite` covers normal range expansion and large range truncation.
+  - Static check: old unbounded `stride(from:through:by:)` expansion is gone.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: high SRTLA shared-code impact, no affected flows.
