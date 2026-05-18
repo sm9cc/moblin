@@ -1193,3 +1193,43 @@ Date: 2026-05-18
   - `swift test --filter RtmpSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.35, no affected flows; review context flags shared FLV enum impact.
+
+## Continued sweep 2026-05-18 ADTS frame validation
+
+### Assumptions
+
+- ADTS AAC frame parsing should reject malformed packetized elementary stream data at the header boundary.
+- The existing writer emits complete protection-absent ADTS frames and must keep the same output.
+- This fix should not change MPEG-TS packet assembly or sample-buffer timing.
+
+### Acceptance criteria
+
+- ADTS headers shorter than seven bytes are rejected.
+- ADTS headers with an invalid syncword are rejected.
+- ADTS headers whose declared frame length exceeds the available data are rejected.
+- Complete ADTS frames still parse and expose the declared frame length.
+
+### Checklist
+
+- [x] Select high-risk MPEG-TS AAC parser path using local code and transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 38 checks:
+  - Red check: `AdtsHeader` accepted buffers without the 12-bit ADTS syncword and accepted declared frame lengths beyond the available buffer.
+  - Corpus check: FFmpeg's ADTS demuxer validates a seven-byte header, checks the syncword, and rejects frame sizes smaller than the header.
+  - Green check: `AdtsHeader` now validates the ADTS syncword and rejects declared frame lengths outside the available buffer.
+  - Green check: `AdtsSuite` covers short headers, invalid syncwords, truncated frames, and complete frames.
+  - Scope check: ADTS encoding, MPEG-TS packet assembly, and sample-buffer timestamp handling are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter AdtsSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.35, no affected flows; review context flags shared ADTS reader impact.

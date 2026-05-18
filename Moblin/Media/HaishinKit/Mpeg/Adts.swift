@@ -19,6 +19,10 @@ struct AdtsHeader: Equatable {
         guard AdtsHeader.size <= data.count else {
             return nil
         }
+        let syncWord = UInt16(data[0]) << 8 | UInt16(data[1])
+        guard syncWord & 0xFFF6 == 0xFFF0 else {
+            return nil
+        }
         sync = data[0]
         protectionAbsent = (data[1] & 0b0000_0001) == 1
         profile = data[2] >> 6 & 0b11
@@ -29,7 +33,7 @@ struct AdtsHeader: Equatable {
         copyrightIdBit = (data[3] & 0b0000_1000) == 0b0000_1000
         copyrightIdStart = (data[3] & 0b0000_0100) == 0b0000_0100
         aacFrameLength = UInt16(data[3] & 0b0000_0011) << 11 | UInt16(data[4]) << 3 | UInt16(data[5] >> 5)
-        guard aacFrameLength >= AdtsHeader.size else {
+        guard Int(aacFrameLength) >= AdtsHeader.size, Int(aacFrameLength) <= data.count else {
             return nil
         }
     }
