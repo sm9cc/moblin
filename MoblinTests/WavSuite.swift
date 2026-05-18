@@ -6,8 +6,8 @@ struct WavSuite {
     @Test
     func mono() {
         let samples: [[Int16]] = [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]
-        let wav = createWav(sampleRate: 48000, samples: samples)
-        #expect(wav == createMonoWav(samples[0]))
+        let wav = createWav(sampleRate: 44100, samples: samples)
+        #expect(wav == createMonoWav(sampleRate: 44100, samples[0]))
     }
 
     @Test
@@ -19,7 +19,7 @@ struct WavSuite {
     }
 }
 
-private func createMonoWav(_ samples: [Int16]) -> Data {
+private func createMonoWav(sampleRate: UInt32, _ samples: [Int16]) -> Data {
     let dataSize = UInt32(samples.count * 2)
     let writer = ByteWriter()
     writer.writeUTF8Bytes("RIFF")
@@ -29,9 +29,9 @@ private func createMonoWav(_ samples: [Int16]) -> Data {
     writer.writeUInt32Le(16)
     writer.writeUInt16Le(1) // int16
     writer.writeUInt16Le(1) // Mono
-    writer.writeUInt32Le(48000) // sample rate
-    writer.writeUInt32Le(0x02EE00) // 192 kbps
-    writer.writeUInt16Le(4)
+    writer.writeUInt32Le(sampleRate)
+    writer.writeUInt32Le(sampleRate * 2)
+    writer.writeUInt16Le(2)
     writer.writeUInt16Le(16)
     writer.writeUTF8Bytes("data")
     writer.writeUInt32Le(dataSize)

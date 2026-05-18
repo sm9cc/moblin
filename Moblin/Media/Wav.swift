@@ -2,15 +2,18 @@ import Foundation
 
 func createWav(sampleRate: Int, samples: [[Int16]]) -> Data? {
     let numberOfChannels = samples.count
+    let bitsPerSample = 16
+    let bytesPerSample = bitsPerSample / 8
+    let blockAlign = numberOfChannels * bytesPerSample
     let dataSize: UInt32
     switch numberOfChannels {
     case 1:
-        dataSize = UInt32(samples[0].count * 2)
+        dataSize = UInt32(samples[0].count * bytesPerSample)
     case 2:
         guard samples[0].count == samples[1].count else {
             return nil
         }
-        dataSize = UInt32(samples[0].count * 2 * 2)
+        dataSize = UInt32(samples[0].count * bytesPerSample * numberOfChannels)
     default:
         return nil
     }
@@ -23,9 +26,9 @@ func createWav(sampleRate: Int, samples: [[Int16]]) -> Data? {
     writer.writeUInt16Le(1) // int16
     writer.writeUInt16Le(UInt16(numberOfChannels))
     writer.writeUInt32Le(UInt32(sampleRate))
-    writer.writeUInt32Le(0x02EE00) // 192 kbps
-    writer.writeUInt16Le(4)
-    writer.writeUInt16Le(16)
+    writer.writeUInt32Le(UInt32(sampleRate * blockAlign))
+    writer.writeUInt16Le(UInt16(blockAlign))
+    writer.writeUInt16Le(UInt16(bitsPerSample))
     writer.writeUTF8Bytes("data")
     writer.writeUInt32Le(dataSize)
     switch numberOfChannels {
