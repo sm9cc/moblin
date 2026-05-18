@@ -17,13 +17,15 @@ protocol WebrtcIngestClientDelegate: AnyObject {
     func webrtcIngestClientOnDataReceived(streamId: UUID, count: Int)
 }
 
-private func decodeNtpTimestamp(v: UInt64) -> Double? {
-    guard v >= 2_208_988_800 else {
+private let ntpUnixEpochOffset: UInt64 = 2_208_988_800
+
+func decodeNtpTimestamp(v: UInt64) -> Double? {
+    let seconds = v >> 32
+    guard seconds >= ntpUnixEpochOffset else {
         return nil
     }
-    let secs = Int64(bitPattern: (v >> 32) - 2_208_988_800)
-    let nanos = Int64(Double(((v & 0xFFFF_FFFF) * 1_000_000_000) / (1 << 32)))
-    return Double(secs) + Double(nanos) / 1_000_000_000
+    let fraction = Double(v & 0xFFFF_FFFF) / Double(UInt64(1) << 32)
+    return Double(seconds - ntpUnixEpochOffset) + fraction
 }
 
 private func toIngestClient(pointer: UnsafeMutableRawPointer?) -> WebrtcIngestClient? {

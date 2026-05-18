@@ -1272,6 +1272,53 @@ Date: 2026-05-18
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS parser impact.
 
+## Continued sweep 2026-05-18 WebRTC NTP timestamp validation
+
+### Assumptions
+
+- WebRTC RTCP sync timestamps use the standard 64-bit NTP fixed-point format.
+- The high 32 bits are seconds and the low 32 bits are fractional seconds.
+- Timestamps before the Unix epoch should be rejected before subtracting the NTP epoch offset.
+
+### Acceptance criteria
+
+- `decodeNtpTimestamp` validates the high 32-bit seconds field, not the whole fixed-point value.
+- Fraction-only values cannot underflow the Unix epoch subtraction.
+- A focused unit test covers epoch conversion, fractional conversion, and pre-Unix rejection.
+
+### Checklist
+
+- [x] Select high-risk WebRTC RTCP sync timestamp path using local code and transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [ ] Commit the fix alone.
+
+### Review
+
+- Defect 46 checks:
+  - Red check: `decodeNtpTimestamp` compared the whole 64-bit fixed-point value to the Unix epoch
+    offset, allowing fraction-only values through and underflowing the seconds subtraction.
+  - Corpus check: GStreamer reads NTP timestamps as separate high 32-bit seconds and low 32-bit
+    fractional fields.
+  - Green check: `decodeNtpTimestamp` now validates the seconds field before subtracting the epoch
+    offset and converts the fraction independently.
+  - Green check: `RtspClientSuite.decodeNtpTimestampUsesSecondsField` covers Unix epoch, 1.5 second
+    fractional conversion, and a pre-Unix fraction-only value.
+  - Scope check: WebRTC track setup, depacketizers, audio/video decoding, timestamp rebasing, and
+    target latency logic are unchanged.
+  - `python3` timestamp formula check: `[0.0, 1.5, None]`.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: one pre-existing 120-character line remains at
+    `MoblinTests/RtspClientSuite.swift:113`; no changed line exceeded 110 characters.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: minimal/detect risk 0.40, no affected flows; review context flags high impact
+    because WebRTC ingest is a shared media path.
+
 ## Continued sweep 2026-05-18 RTMP extended chunk stream IDs
 
 ### Assumptions

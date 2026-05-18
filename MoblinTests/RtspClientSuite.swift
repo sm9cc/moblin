@@ -80,6 +80,17 @@ struct RtspClientSuite {
     }
 
     @Test
+    func decodeNtpTimestampUsesSecondsField() {
+        let unixEpoch = UInt64(2_208_988_800) << 32
+        #expect(decodeNtpTimestamp(v: unixEpoch) == 0.0)
+
+        let oneAndHalfSeconds = (UInt64(2_208_988_801) << 32) | (UInt64(1) << 31)
+        #expect(decodeNtpTimestamp(v: oneAndHalfSeconds) == 1.5)
+
+        #expect(decodeNtpTimestamp(v: 0x0000_0000_FFFF_FFFF) == nil)
+    }
+
+    @Test
     func makeSetupUrlAddsSeparatorForRelativeControl() throws {
         let url = try makeRtspSetupUrl(baseUrl: "rtsp://example.com/live", controlUrl: "trackID=1")
         #expect(url?.absoluteString == "rtsp://example.com/live/trackID=1")
