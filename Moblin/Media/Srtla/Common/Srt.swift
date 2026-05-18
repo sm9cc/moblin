@@ -3,6 +3,8 @@ import Foundation
 let srtControlPacketTypeBit: UInt16 = 0x8000
 let srtControlTypeSize = 2
 let srtSequenceNumberSize = 4
+let srtMaximumSequenceNumber: UInt32 = 0x7FFF_FFFF
+let srtSequenceNumberRangeBit: UInt32 = 0x8000_0000
 let srtNakMaximumSequenceNumbers = 1300 / 4
 
 enum SrtPacketType: UInt16 {
@@ -38,7 +40,15 @@ func isSrtSnAcked(sn: UInt32, ackSn: UInt32) -> Bool {
 }
 
 func isSrtSnRange(sn: UInt32) -> Bool {
-    (sn & 0x8000_0000) == 0x8000_0000
+    (sn & srtSequenceNumberRangeBit) == srtSequenceNumberRangeBit
+}
+
+func nextSrtSn(sn: UInt32) -> UInt32 {
+    if sn == srtMaximumSequenceNumber {
+        0
+    } else {
+        sn + 1
+    }
 }
 
 func processSrtNak(packet: Data, onNak: (UInt32) -> Void) {
@@ -59,16 +69,16 @@ func processSrtNak(packet: Data, onNak: (UInt32) -> Void) {
             guard offset <= packet.count - 4 else {
                 return
             }
-            let upToNakSn = packet.getUInt32Be(offset: offset)
-            var sn = nakSn & 0x7FFF_FFFF
-            while sn <= upToNakSn {
+            let upToNakSn = packet.getUInt32Be(offset: offset) & srtMaximumSequenceNumber
+            var sn = nakSn & srtMaximumSequenceNumber
+            while true {
                 guard processSn(sn) else {
                     return
                 }
                 if sn == upToNakSn {
                     break
                 }
-                sn += 1
+                sn = nextSrtSn(sn: sn)
             }
             offset += 4
         } else {

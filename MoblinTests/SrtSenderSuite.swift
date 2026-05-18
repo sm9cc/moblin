@@ -55,6 +55,16 @@ struct SrtSenderSuite {
     }
 
     @Test
+    func processSrtNakRangeWraps() {
+        let packet = createSrtNakPacket([0xFFFF_FFFE, 0x0000_0001])
+        var sns: [UInt32] = []
+        processSrtNak(packet: packet) { sn in
+            sns.append(sn)
+        }
+        #expect(sns == [0x7FFF_FFFE, 0x7FFF_FFFF, 0, 1])
+    }
+
+    @Test
     func processSrtNakLargeRangeIsBounded() {
         let packet = createSrtNakPacket([0x8000_0001, UInt32(srtNakMaximumSequenceNumbers + 100)])
         var count = 0

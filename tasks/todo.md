@@ -1026,3 +1026,44 @@ Date: 2026-05-18
   - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: medium working-tree risk with no affected flows; reported expected native SRT callback test gaps.
+
+## Continued sweep 2026-05-18 SRT NAK range wraparound
+
+### Assumptions
+
+- SRT packet sequence numbers are 31-bit and wrap from `0x7fffffff` to `0`.
+- A NAK loss range may cross that wrap boundary.
+- Existing NAK range expansion bounds must stay in place to avoid oversized retransmit work.
+
+### Acceptance criteria
+
+- Shared SRT NAK parsing expands wraparound ranges instead of dropping them.
+- The experimental SRT sender retransmit path uses the same wraparound sequence increment.
+- Existing maximum NAK expansion bounds still stop large ranges.
+- Focused unit coverage documents the wraparound range case.
+
+### Checklist
+
+- [x] Select high-risk SRT/SRTLA packet-loss recovery path using local code and SRT corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 34 checks:
+  - Red check: `processSrtNak` used `while sn <= upToNakSn`, so a range such as `0x7ffffffe ... 1` produced no sequence numbers.
+  - Red check: `SrtSender.handleNakPacket` had the same ascending-only loop in the retransmit path.
+  - Corpus check: Haivision SRT defines sequence numbers as `0 ... 2^31 - 1` and uses wrap-aware `incseq`/`seqcmp` helpers.
+  - Green check: shared NAK parsing now increments sequence numbers with wraparound and keeps the existing maximum expansion bound.
+  - Green check: `SrtSender.handleNakPacket` uses the same wraparound increment when scheduling retransmits.
+  - Green check: `SrtSenderSuite` covers a NAK range crossing `0x7fffffff` to `0`.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: medium working-tree risk with no affected flows; reported existing private SRT sender test gaps.
