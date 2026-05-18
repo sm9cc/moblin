@@ -1389,6 +1389,45 @@ Date: 2026-05-18
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS parser impact.
 
+## Continued sweep 2026-05-18 PES packet length bounds
+
+### Assumptions
+
+- A nonzero MPEG-2 PES packet length bounds bytes after the packet-length field.
+- Packet length zero remains unbounded for video and other streams that use open-ended PES payloads.
+- Trailing bytes beyond a bounded PES length should not be exposed as media payload.
+
+### Acceptance criteria
+
+- Bounded PES packets read only the payload bytes declared by `PES_packet_length`.
+- Packet length zero keeps reading all remaining payload bytes.
+- A focused unit test covers a bounded PES with extra trailing bytes.
+
+### Checklist
+
+- [x] Select high-risk MPEG-TS PES reassembly path using local code and transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 44 checks:
+  - Red check: `MpegTsPacketizedElementaryStream.init(data:)` parsed `packetLength` but read all remaining bytes into `data`.
+  - Corpus check: FFmpeg caps PES payload collection using `PES_packet_length + PES_START_SIZE - pes_header_size`.
+  - Green check: nonzero `packetLength` now bounds the number of media payload bytes read after the optional header.
+  - Green check: `MpegTsPacketizedElementaryStreamSuite.boundedPacketLengthDropsTrailingBytes` covers trailing bytes after a bounded PES.
+  - Scope check: packet length zero, optional-header parsing, timestamp validation, and TS packet writing are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter MpegTsPacketizedElementaryStreamSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS parser impact.
+
 ## Continued sweep 2026-05-18 PES timestamp field validation
 
 ### Assumptions

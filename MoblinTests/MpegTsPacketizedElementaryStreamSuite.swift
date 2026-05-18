@@ -72,6 +72,14 @@ struct MpegTsPacketizedElementaryStreamSuite {
     }
 
     @Test
+    func boundedPacketLengthDropsTrailingBytes() throws {
+        let stream = try MpegTsPacketizedElementaryStream(
+            data: Data([0, 0, 1, 0xE0, 0, 4, 0x80, 0, 0, 0xAA, 0xBB])
+        )
+        #expect(stream.data == Data([0xAA]))
+    }
+
+    @Test
     func encodesProgramClockReferenceExtensionHighBit() {
         #expect(TSProgramClockReference.encode(0, 0x0100) == Data([0, 0, 0, 0, 0x7F, 0]))
     }

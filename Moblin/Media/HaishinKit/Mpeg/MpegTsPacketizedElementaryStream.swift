@@ -167,7 +167,17 @@ struct MpegTsPacketizedElementaryStream {
         optionalHeader = try OptionalHeader(data: reader.readBytes(reader.bytesAvailable))
         reader.position = MpegTsPacketizedElementaryStream
             .untilPacketLengthSize + 3 + Int(optionalHeader.pesHeaderLength)
-        self.data = try reader.readBytes(reader.bytesAvailable)
+        if packetLength == 0 {
+            self.data = try reader.readBytes(reader.bytesAvailable)
+        } else {
+            let dataLength = Int(packetLength) -
+                OptionalHeader.fixedSectionSize -
+                Int(optionalHeader.pesHeaderLength)
+            guard dataLength >= 0 else {
+                throw "Invalid PES packet length"
+            }
+            self.data = try reader.readBytes(dataLength)
+        }
     }
 
     mutating func append(data: Data) {
