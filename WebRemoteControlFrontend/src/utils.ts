@@ -287,8 +287,16 @@ export class WebSocketConnection {
       this.reconnectSoon();
     };
     this.websocket.onmessage = async (event: MessageEvent<string>) => {
-      const message = JSON.parse(event.data) as IncomingMessage;
-      await this.handleMessage(message);
+      let message: unknown;
+      try {
+        message = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (message === null || typeof message !== "object") {
+        return;
+      }
+      await this.handleMessage(message as IncomingMessage);
     };
   }
 
