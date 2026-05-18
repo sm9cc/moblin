@@ -751,3 +751,43 @@ Date: 2026-05-18
   - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: low RTSP auth impact, no affected flows; reported a test gap for the private auth path.
+
+## Continued sweep 2026-05-18 RTSP setup control URL joining
+
+### Assumptions
+
+- SDP `a=control:` values are URI references and must be joined with the RTSP aggregate URL.
+- Relative control values such as `trackID=1` should append as a path segment when `Content-Base` lacks a trailing slash.
+- Control query strings must be preserved in the SETUP request URL.
+
+### Acceptance criteria
+
+- Relative control values join to `Content-Base` with exactly one separator slash.
+- Absolute RTSP control URLs remain unchanged.
+- Query strings in relative control values remain in the generated SETUP URL.
+- Existing missing-control fallback to the client RTSP URL remains unchanged.
+
+### Checklist
+
+- [x] Select a high-risk RTSP setup URL path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Add focused parser tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 27 checks:
+  - Red check: `makeSetupUrl` appended `controlUrl.path` directly to `Content-Base`, which dropped relative query strings and produced `rtsp://example.com/livetrackID=1` when the base URL had no trailing slash.
+  - Corpus check: FFmpeg appends a separator before relative SDP control paths, and GStreamer builds stream setup locations from the aggregate control URL plus the stream control value.
+  - Green check: SDP control values remain raw strings, and `makeRtspSetupUrl` joins relative control values with exactly one separator slash while preserving query strings.
+  - Regression coverage: `RtspClientSuite` covers relative control paths, relative query strings, duplicate slash avoidance, absolute control URLs, and missing control fallback.
+  - Static check: no `controlUrl.path`, `var control: URL`, or `URL(string: mediaDescription.getValue(for: "control"))` remains in the RTSP setup path.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: medium RTSP parser impact, no affected flows; reported test gaps for private/internal RTSP parser entities despite focused `RtspClientSuite` coverage.

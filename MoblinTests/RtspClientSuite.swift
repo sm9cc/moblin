@@ -78,4 +78,34 @@ struct RtspClientSuite {
             0x11, 0x22, 0x33, 0x44, 0x65, 0x88,
         ]))
     }
+
+    @Test
+    func makeSetupUrlAddsSeparatorForRelativeControl() throws {
+        let url = try makeRtspSetupUrl(baseUrl: "rtsp://example.com/live", controlUrl: "trackID=1")
+        #expect(url?.absoluteString == "rtsp://example.com/live/trackID=1")
+    }
+
+    @Test
+    func makeSetupUrlPreservesRelativeControlQuery() throws {
+        let url = try makeRtspSetupUrl(baseUrl: "rtsp://example.com/live/", controlUrl: "trackID=1?token=abc")
+        #expect(url?.absoluteString == "rtsp://example.com/live/trackID=1?token=abc")
+    }
+
+    @Test
+    func makeSetupUrlAvoidsDuplicateSeparator() throws {
+        let url = try makeRtspSetupUrl(baseUrl: "rtsp://example.com/live/", controlUrl: "/trackID=1")
+        #expect(url?.absoluteString == "rtsp://example.com/live/trackID=1")
+    }
+
+    @Test
+    func makeSetupUrlKeepsAbsoluteControlUrl() throws {
+        let url = try makeRtspSetupUrl(baseUrl: "rtsp://example.com/live", controlUrl: "rtsp://media.example.com/track")
+        #expect(url?.absoluteString == "rtsp://media.example.com/track")
+    }
+
+    @Test
+    func makeSetupUrlReturnsNilWithoutControlUrl() throws {
+        let url = try makeRtspSetupUrl(baseUrl: "rtsp://example.com/live", controlUrl: nil)
+        #expect(url == nil)
+    }
 }

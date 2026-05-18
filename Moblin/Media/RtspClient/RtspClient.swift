@@ -28,7 +28,7 @@ private enum SdpVideoCodec {
 }
 
 private class SdpVideo {
-    var control: URL?
+    var control: String?
     var codec: SdpVideoCodec?
 }
 
@@ -157,7 +157,7 @@ private class Sdp {
                 } else {
                     throw "Unsupported codec in rtpmap: \(rtpmap)"
                 }
-                video.control = try URL(string: mediaDescription.getValue(for: "control"))
+                video.control = try mediaDescription.getValue(for: "control")
                 self.video = video
             default:
                 break
@@ -305,6 +305,27 @@ private enum State {
 
 private func md5String(data: String) -> String {
     calculateMd5(data).hexString()
+}
+
+func makeRtspSetupUrl(baseUrl: String, controlUrl: String?) throws -> URL? {
+    guard let controlUrl else {
+        return nil
+    }
+    if let url = URL(string: controlUrl), url.host() != nil {
+        return url
+    }
+    let urlString: String
+    if baseUrl.hasSuffix("/") && controlUrl.hasPrefix("/") {
+        urlString = baseUrl + String(controlUrl.dropFirst())
+    } else if baseUrl.hasSuffix("/") || controlUrl.hasPrefix("/") {
+        urlString = baseUrl + controlUrl
+    } else {
+        urlString = baseUrl + "/" + controlUrl
+    }
+    guard let url = URL(string: urlString) else {
+        throw "Bad control URL: \(controlUrl)"
+    }
+    return url
 }
 
 extension URL {
@@ -918,15 +939,9 @@ class RtspClient: @unchecked Sendable {
         try performSetup(url: makeSetupUrl(baseUrl: baseUrl, controlUrl: sdp.video?.control))
     }
 
-    private func makeSetupUrl(baseUrl: String, controlUrl: URL?) throws -> URL {
-        if let controlUrl {
-            if controlUrl.host() != nil {
-                return controlUrl
-            } else if let url = URL(string: baseUrl + controlUrl.path) {
-                return url
-            } else {
-                throw "Bad control URL: \(controlUrl)"
-            }
+    private func makeSetupUrl(baseUrl: String, controlUrl: String?) throws -> URL {
+        if let url = try makeRtspSetupUrl(baseUrl: baseUrl, controlUrl: controlUrl) {
+            return url
         }
         return url
     }
