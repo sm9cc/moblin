@@ -85,6 +85,25 @@ struct MpegTsPacketizedElementaryStreamSuite {
     }
 
     @Test
+    func parsesProgramAssociationWithValidCrc() throws {
+        let table = MpegTsProgramAssociation()
+        table.programs[1] = 256
+        let parsedTable = try MpegTsProgramAssociation(data: table.packet(0).payload)
+        #expect(parsedTable.programs[1] == 256)
+    }
+
+    @Test
+    func rejectsProgramAssociationCrcMismatch() {
+        let table = MpegTsProgramAssociation()
+        table.programs[1] = 256
+        var payload = table.packet(0).payload
+        payload[12] ^= 0x01
+        #expect(throws: "Invalid PSI CRC") {
+            try MpegTsProgramAssociation(data: payload)
+        }
+    }
+
+    @Test
     func shortPayloadFirstPacketIsFullSize() {
         let stream = MpegTsPacketizedElementaryStream(
             streamId: 0xE0,

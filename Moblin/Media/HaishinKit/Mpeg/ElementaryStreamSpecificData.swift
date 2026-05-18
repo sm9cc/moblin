@@ -34,7 +34,7 @@ struct ElementaryStreamSpecificData {
     init(reader: ByteReader) throws {
         streamType = try ElementaryStreamType(rawValue: reader.readUInt8()) ?? .unspecific
         elementaryPacketId = try reader.readUInt16() & 0x0FFF
-        let esInfoLength = try reader.readUInt16() & 0x01FF
+        let esInfoLength = try reader.readUInt16() & 0x0FFF
         esDescriptors = try reader.readBytes(Int(esInfoLength))
     }
 

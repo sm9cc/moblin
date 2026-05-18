@@ -26,11 +26,12 @@ class MpegTsProgramSpecificInformation {
         let reader = ByteReader(data: data)
         pointerField = try reader.readUInt8()
         pointerSkippedBytes = try reader.readBytes(Int(pointerField))
+        let sectionStartPosition = reader.position
         tableId = try reader.readUInt8()
         let value = try reader.readUInt16()
         let sectionSyntaxIndicator = (value & 0x8000) == 0x8000
         privateBit = (value & 0x4000) == 0x4000
-        var sectionLength = Int(value & 0x3FF)
+        var sectionLength = Int(value & 0x0FFF)
         if sectionSyntaxIndicator {
             tableIdExtension = try reader.readUInt16()
             let value = try reader.readUInt8()
@@ -40,7 +41,12 @@ class MpegTsProgramSpecificInformation {
             lastSectionNumber = try reader.readUInt8()
             sectionLength -= 5
         }
-        try decodeSectionData(data: reader.readBytes(sectionLength - 4))
+        let sectionData = try reader.readBytes(sectionLength - 4)
+        _ = try reader.readUInt32()
+        guard Crc32.mpeg2.calculate(data[sectionStartPosition ..< reader.position]) == 0 else {
+            throw "Invalid PSI CRC"
+        }
+        try decodeSectionData(data: sectionData)
     }
 
     fileprivate func encodeSectionData() -> Data {
@@ -134,7 +140,7 @@ final class MpegTsProgramMapping: MpegTsProgramSpecificInformation {
     override fileprivate func decodeSectionData(data: Data) throws {
         let reader = ByteReader(data: data)
         programClockReferencePacketId = try reader.readUInt16() & 0x1FFF
-        let programInfoLength = try reader.readUInt16() & 0x03FF
+        let programInfoLength = try reader.readUInt16() & 0x0FFF
         try reader.skipBytes(Int(programInfoLength))
         while reader.bytesAvailable > 0 {
             try elementaryStreamSpecificDatas.append(ElementaryStreamSpecificData(reader: reader))
