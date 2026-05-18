@@ -44,4 +44,13 @@ struct RtmpSuite {
         #expect(MpegTsAudioConfig(data: []) == nil)
         #expect(MpegTsAudioConfig(data: [0]) == nil)
     }
+
+    @Test
+    func rtmpChunkSizeValidation() {
+        #expect(!isValidRtmpChunkSize(0))
+        #expect(isValidRtmpChunkSize(1))
+        #expect(isValidRtmpChunkSize(0x7FFF_FFFF))
+        #expect(!isValidRtmpChunkSize(0x8000_0000))
+        #expect(!isValidRtmpChunkSize(0xFFFF_FFFF))
+    }
 }

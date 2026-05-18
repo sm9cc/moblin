@@ -831,3 +831,42 @@ Date: 2026-05-18
   - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: medium RTSP parser impact, no affected flows; reported test gaps for private/internal RTSP entities.
+
+## Continued sweep 2026-05-18 RTMP peer chunk-size validation
+
+### Assumptions
+
+- RTMP Set Chunk Size values from peers must be at least 1 and no larger than 0x7FFFFFFF.
+- Invalid chunk sizes should stop the RTMP client before receive sizing is updated.
+- The existing default chunk size and valid peer chunk-size handling should remain unchanged.
+
+### Acceptance criteria
+
+- Peer chunk size 0 is rejected.
+- Peer chunk sizes above 0x7FFFFFFF are rejected.
+- Peer chunk sizes 1 and 0x7FFFFFFF remain accepted.
+- Tests cover the accepted and rejected protocol boundary values.
+
+### Checklist
+
+- [x] Select a high-risk RTMP control-message path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Add focused tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 29 checks:
+  - Red check: RTMP Set Chunk Size accepted peer values 0 and values above 0x7FFFFFFF, then updated the server receive chunk size with those invalid values.
+  - Corpus check: GStreamer defines valid peer chunk sizes as 1 through 0x7FFFFFFF and rejects out-of-range values before assignment; FFmpeg rejects non-positive incoming chunk sizes.
+  - Green check: `processMessageChunkSize` now rejects invalid peer chunk sizes before updating `chunkSizeFromClient`, while boundary values 1 and 0x7FFFFFFF remain valid.
+  - Regression coverage: `RtmpSuite.rtmpChunkSizeValidation` covers zero, lower boundary, upper boundary, and oversized peer values.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtmpSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: low working-tree risk with one reported test gap on a nearby function, and no affected flows.

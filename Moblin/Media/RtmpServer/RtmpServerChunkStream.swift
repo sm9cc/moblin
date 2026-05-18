@@ -2,6 +2,13 @@ import AVFoundation
 import Foundation
 import Network
 
+private let rtmpMinimumChunkSize: UInt32 = 1
+private let rtmpMaximumChunkSize: UInt32 = 0x7FFF_FFFF
+
+func isValidRtmpChunkSize(_ size: UInt32) -> Bool {
+    size >= rtmpMinimumChunkSize && size <= rtmpMaximumChunkSize
+}
+
 class RtmpServerChunkStream: @unchecked Sendable {
     private var messageBody: Data
     var messageLength: Int
@@ -274,7 +281,12 @@ class RtmpServerChunkStream: @unchecked Sendable {
             client.stopInternal(reason: "Not 4 bytes chunk size")
             return
         }
-        client.chunkSizeFromClient = Int(messageBody.getFourBytesBe())
+        let chunkSize = messageBody.getFourBytesBe()
+        guard isValidRtmpChunkSize(chunkSize) else {
+            client.stopInternal(reason: "Invalid chunk size \(chunkSize)")
+            return
+        }
+        client.chunkSizeFromClient = Int(chunkSize)
         logger.info("rtmp-server: client: Chunk size from client: \(client.chunkSizeFromClient)")
     }
 
