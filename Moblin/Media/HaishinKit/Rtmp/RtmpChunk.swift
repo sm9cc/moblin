@@ -39,11 +39,49 @@ enum RtmpChunkType: UInt8 {
     }
 }
 
+struct RtmpBasicHeader {
+    let type: RtmpChunkType
+    let chunkStreamId: UInt16
+    let size: Int
+}
+
+func rtmpBasicHeader(data: Data) -> RtmpBasicHeader? {
+    guard let firstByte = data.first,
+          let type = RtmpChunkType(rawValue: firstByte >> 6)
+    else {
+        return nil
+    }
+    let chunkStreamId = UInt16(firstByte & 0b0011_1111)
+    switch chunkStreamId {
+    case 0:
+        guard data.count >= 2 else {
+            return nil
+        }
+        return RtmpBasicHeader(type: type, chunkStreamId: UInt16(data[1]) + 64, size: 2)
+    case 1:
+        guard data.count >= 3 else {
+            return nil
+        }
+        let encodedChunkStreamId = UInt32(data[1]) | (UInt32(data[2]) << 8)
+        let chunkStreamId = encodedChunkStreamId + 64
+        guard chunkStreamId <= UInt32(UInt16.max) else {
+            return nil
+        }
+        return RtmpBasicHeader(
+            type: type,
+            chunkStreamId: UInt16(chunkStreamId),
+            size: 3
+        )
+    default:
+        return RtmpBasicHeader(type: type, chunkStreamId: chunkStreamId, size: 1)
+    }
+}
+
 private func basicAndMessageHeadersSize(chunkStreamId: UInt16, type: RtmpChunkType) -> Int {
     basicHeaderSize(chunkStreamId: chunkStreamId) + type.messageHeaderSize()
 }
 
-private func basicHeaderSize(chunkStreamId: UInt16) -> Int {
+func basicHeaderSize(chunkStreamId: UInt16) -> Int {
     if chunkStreamId <= 63 {
         return 1
     }
@@ -53,7 +91,7 @@ private func basicHeaderSize(chunkStreamId: UInt16) -> Int {
     return 3
 }
 
-private func basicHeaderSize(_ byte: UInt8) -> Int {
+func basicHeaderSize(_ byte: UInt8) -> Int {
     switch byte & 0b0011_1111 {
     case 0:
         2
@@ -192,16 +230,12 @@ final class RtmpChunk {
     }
 
     private func decode(data: Data) throws {
-        let reader = ByteReader(data: data)
-        chunkStreamId = try UInt16(reader.readUInt8() & 0b0011_1111)
-        switch chunkStreamId {
-        case 0:
-            chunkStreamId = try UInt16(reader.readUInt8()) + 64
-        case 1:
-            chunkStreamId = try reader.readUInt16Le() + 64
-        default:
-            break
+        guard let basicHeader = rtmpBasicHeader(data: data) else {
+            return
         }
+        let reader = ByteReader(data: data)
+        chunkStreamId = basicHeader.chunkStreamId
+        reader.position = basicHeader.size
         header.append(data[0 ..< basicAndMessageHeadersSize(chunkStreamId: chunkStreamId, type: type)])
         guard type == .zero || type == .one else {
             return

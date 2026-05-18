@@ -1272,6 +1272,53 @@ Date: 2026-05-18
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS parser impact.
 
+## Continued sweep 2026-05-18 RTMP extended chunk stream IDs
+
+### Assumptions
+
+- RTMP clients may legally use chunk stream IDs that require 2-byte or 3-byte basic headers.
+- Rejecting extended basic headers before the message header is a real interoperability failure.
+- The fix should not change message header parsing, chunk payload parsing, or outbound chunk encoding.
+
+### Acceptance criteria
+
+- The RTMP server accepts 1-byte, 2-byte, and 3-byte basic headers.
+- Extended chunk stream IDs are decoded with the RTMP little-endian 3-byte form.
+- A focused unit test covers the basic-header decoder.
+
+### Checklist
+
+- [x] Select high-risk RTMP chunk parser path using local code and transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [ ] Commit the fix alone.
+
+### Review
+
+- Defect 45 checks:
+  - Red check: `RtmpServerClient` stopped any client that used RTMP chunk stream ID forms encoded with
+    2-byte or 3-byte basic headers.
+  - Corpus check: GStreamer's RTMP chunk parser decodes ID 0 as next byte plus 64 and ID 1 as
+    little-endian 16-bit value plus 64.
+  - Green check: server receive state now reads remaining basic-header bytes and dispatches the same
+    message-header states for 1-byte, 2-byte, and 3-byte chunk stream IDs.
+  - Green check: `RtmpChunk` and `RtmpServerClient` now share the same basic-header decoder.
+  - Green check: `RtmpSuite.rtmpBasicHeaderDecodesExtendedChunkStreamIds` covers 1-byte, 2-byte, and
+    little-endian 3-byte basic headers.
+  - Scope check: message header parsing, chunk payload parsing, outbound chunk splitting, and media
+    decoding are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: one pre-existing 111-character line remains at
+    `Moblin/Media/RtmpServer/RtmpServerClient.swift:381`; no changed line exceeded 110 characters.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtmpSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: minimal/detect risk 0.40, no affected flows; review context flags high impact
+    because RTMP chunk decoding is shared by many impacted nodes.
+
 ## Continued sweep 2026-05-18 PES marker bit validation
 
 ### Assumptions

@@ -55,6 +55,24 @@ struct RtmpSuite {
     }
 
     @Test
+    func rtmpBasicHeaderDecodesExtendedChunkStreamIds() {
+        let oneByte = rtmpBasicHeader(data: Data([0x43]))
+        #expect(oneByte?.type == .one)
+        #expect(oneByte?.chunkStreamId == 3)
+        #expect(oneByte?.size == 1)
+
+        let twoByte = rtmpBasicHeader(data: Data([0x80, 0x00]))
+        #expect(twoByte?.type == .two)
+        #expect(twoByte?.chunkStreamId == 64)
+        #expect(twoByte?.size == 2)
+
+        let threeByte = rtmpBasicHeader(data: Data([0xC1, 0x50, 0x01]))
+        #expect(threeByte?.type == .three)
+        #expect(threeByte?.chunkStreamId == 400)
+        #expect(threeByte?.size == 3)
+    }
+
+    @Test
     func enhancedVideoFourCcCodecMapping() {
         #expect(FlvVideoFourCC.avc1.codec == .avc)
         #expect(FlvVideoFourCC.hevc.codec == .hevc)
