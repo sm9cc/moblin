@@ -92,6 +92,60 @@ struct SrtSenderSuite {
         await model.waitForDisconnected()
     }
 
+    @Test
+    func ackClearsAllInflightPackets() async throws {
+        let sender = SrtSender(streamId: "1234", latency: 2000, experimental: false)
+        let model = ModelMock()
+        sender.delegate = model
+        try await connect(sender: sender, model: model)
+        let now = ContinuousClock.now
+        let firstPacket = makeDataPacket(sender: sender, payload: [0x47])
+        let secondPacket = makeDataPacket(sender: sender, payload: [0x48])
+        sender.enqueue(packet: firstPacket, now: now)
+        sender.enqueue(packet: secondPacket, now: now)
+        sender.send(now: now.advanced(by: .milliseconds(3)))
+        _ = await model.waitForPacket()
+        let secondPacketHex = await model.waitForPacket()
+        let secondSequenceNumber = try sequenceNumber(packet: secondPacketHex)
+        #expect(sender.getPerformanceData()?.pktFlightSize == 2)
+        sender.input(packet: createAckPacket(sequenceNumber: nextSrtSn(sn: secondSequenceNumber)))
+        #expect(sender.getPerformanceData()?.pktFlightSize == 0)
+    }
+
+    private func connect(sender: SrtSender, model: ModelMock) async throws {
+        sender.start()
+        _ = await checkInductionHandshake(packet: model.waitForPacket())
+        try sender.input(packet: createInductionHandshake())
+        _ = await checkConclusionHandshake(packet: model.waitForPacket())
+        try sender.input(packet: createConclusionHandshake())
+        await model.waitForConnected()
+    }
+
+    private func makeDataPacket(sender: SrtSender, payload: [UInt8]) -> SrtDataPacket {
+        payload.withUnsafeBytes {
+            sender.newDataPacket(payload: $0)
+        }
+    }
+
+    private func createAckPacket(sequenceNumber: UInt32) -> Data {
+        let writer = ByteWriter()
+        writer.writeUInt16(srtControlPacketTypeBit | SrtPacketType.ack.rawValue)
+        writer.writeUInt16(0)
+        writer.writeUInt32(1)
+        writer.writeUInt32(0)
+        writer.writeUInt32(0)
+        writer.writeUInt32(sequenceNumber)
+        writer.writeUInt32(10_000)
+        return writer.data
+    }
+
+    private func sequenceNumber(packet: String) throws -> UInt32 {
+        guard let sequenceNumber = UInt32(packet.substring(begin: 0, end: 8), radix: 16) else {
+            throw "Invalid sequence number"
+        }
+        return sequenceNumber
+    }
+
     private func checkInductionHandshake(packet: String) -> (UInt32, UInt32) {
         #expect(packet.count == 128)
         #expect(packet.substring(begin: 0, end: 16) == "8000000000000000")

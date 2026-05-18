@@ -1688,3 +1688,47 @@ Date: 2026-05-18
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.40, no affected flows; review context flags adaptive bitrate settings/update
     test gaps because Swift tests could not run here.
+
+## Continued sweep 2026-05-19 SRT ACK cleanup
+
+### Assumptions
+
+- SRT ACK numbers identify the next expected sequence number, so packets before that sequence are acknowledged.
+- When an ACK covers all packets currently in flight, the sender must clear the whole in-flight queue.
+- Inflated in-flight state can destabilize retransmission, drop counters, and adaptive bitrate decisions.
+
+### Acceptance criteria
+
+- A full ACK clears all in-flight packets from the deque and lookup map.
+- Partial ACK behavior remains unchanged.
+- Sender packet output, ACKACK output, and retransmit scheduling remain unchanged.
+
+### Checklist
+
+- [x] Select high-risk SRT ACK cleanup path using local code and transport-corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Add focused regression test.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 48 checks:
+  - Red check: if an ACK covered every packet in `packetsInFlight`, `firstIndex` returned nil and no
+    acknowledged packet was removed.
+  - Corpus check: SRT sends ACK as the next expected sequence number when there is no receiver loss, and
+    sender buffers remove data that predates the ACK.
+  - Green check: full ACK now clears both `packetsInFlight` and `packetsInFlightBySequenceNumber`.
+  - Green check: `SrtSenderSuite` covers two in-flight data packets followed by an ACK through the second
+    packet, with flight size dropping from two to zero.
+  - Scope check: partial ACK behavior, NAK handling, packet output, ACKACK output, and retransmit scheduling
+    are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.35, no affected flows; review context flags SRT sender/test gaps because Swift
+    tests could not run here.
