@@ -10,6 +10,13 @@ struct MpegTsPacketizedElementaryStreamSuite {
     }
 
     @Test
+    func rejectsInvalidMarkerBits() {
+        #expect(throws: "Invalid PES marker bits") {
+            try OptionalHeader(data: Data([0b0111_0000, 0, 0]))
+        }
+    }
+
+    @Test
     func rejectsShortPtsField() {
         #expect(throws: "Short PES PTS field") {
             try OptionalHeader(data: Data([0b1000_0000, 0b1000_0000, 4, 0, 0, 0, 0]))

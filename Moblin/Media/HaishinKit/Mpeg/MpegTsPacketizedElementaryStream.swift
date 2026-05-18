@@ -30,6 +30,9 @@ struct OptionalHeader {
         let reader = ByteReader(data: data)
         let bytes = try reader.readBytes(OptionalHeader.fixedSectionSize)
         markerBits = (bytes[0] & 0b1100_0000) >> 6
+        guard markerBits == 0b10 else {
+            throw "Invalid PES marker bits"
+        }
         scramblingControl = (bytes[0] & 0b0011_0000) >> 4
         priority = (bytes[0] & 0b0000_1000) == 0b0000_1000
         dataAlignmentIndicator = (bytes[0] & 0b0000_0100) == 0b0000_0100

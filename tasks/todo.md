@@ -1272,6 +1272,45 @@ Date: 2026-05-18
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS parser impact.
 
+## Continued sweep 2026-05-18 PES marker bit validation
+
+### Assumptions
+
+- MPEG-2 PES optional headers must start with marker bits `10`.
+- Invalid marker bits should reject the PES header before any optional-field parsing.
+- Valid PES optional headers should keep existing bitfield parsing.
+
+### Acceptance criteria
+
+- PES optional headers with marker bits other than `10` are rejected.
+- Existing valid optional-header parsing stays unchanged.
+- A focused unit test covers the rejected marker-bit case.
+
+### Checklist
+
+- [x] Select high-risk MPEG-TS PES fixed-header parser path using local code and transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 41 checks:
+  - Red check: `OptionalHeader` decoded marker bits but accepted values other than `10`, so malformed MPEG-2 PES headers stayed in sync.
+  - Corpus check: GStreamer rejects MPEG-2 PES optional headers when `(flags & 0xc0) != 0x80`.
+  - Green check: `OptionalHeader` now rejects marker bits other than `10` before parsing the remaining optional header fields.
+  - Green check: `MpegTsPacketizedElementaryStreamSuite.rejectsInvalidMarkerBits` covers the malformed marker-bit case.
+  - Scope check: timestamp fields, packet lengths, payload assembly, and valid optional-header parsing are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter MpegTsPacketizedElementaryStreamSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS parser impact.
+
 ## Continued sweep 2026-05-18 PES timestamp field validation
 
 ### Assumptions
