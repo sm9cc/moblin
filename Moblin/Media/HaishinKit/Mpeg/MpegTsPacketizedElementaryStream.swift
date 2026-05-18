@@ -44,6 +44,20 @@ struct OptionalHeader {
         extentionFlag = (bytes[1] & 0b0000_0001) == 0b0000_0001
         pesHeaderLength = bytes[2]
         optionalFields = try reader.readBytes(Int(pesHeaderLength))
+        switch ptsDtsIndicator {
+        case 0:
+            break
+        case 0b10:
+            guard optionalFields.count >= TSTimestamp.dataSize else {
+                throw "Short PES PTS field"
+            }
+        case 0b11:
+            guard optionalFields.count >= 2 * TSTimestamp.dataSize else {
+                throw "Short PES PTS/DTS fields"
+            }
+        default:
+            throw "Invalid PES PTS/DTS flags"
+        }
     }
 
     mutating func setTimestamp(_ presentationTimeStamp: CMTime, _ decodeTimeStamp: CMTime) {

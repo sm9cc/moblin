@@ -1271,3 +1271,43 @@ Date: 2026-05-18
   - `swift test --filter MpegTsPacketizedElementaryStreamSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS parser impact.
+
+## Continued sweep 2026-05-18 PES timestamp field validation
+
+### Assumptions
+
+- MPEG-TS PES packets with timestamp flags must include the full five-byte PTS field or full PTS plus DTS fields.
+- `PTS_DTS_flags == 01` is invalid for MPEG-2 PES.
+- Invalid PES optional headers should fail while parsing the PES header, before timestamp decoding.
+
+### Acceptance criteria
+
+- PES headers with PTS flag and fewer than five optional timestamp bytes are rejected.
+- PES headers with PTS plus DTS flags and fewer than ten optional timestamp bytes are rejected.
+- PES headers with only the DTS flag are rejected.
+- Existing valid PES timestamp parsing remains unchanged.
+
+### Checklist
+
+- [x] Select high-risk MPEG-TS PES timestamp parser path using local code and transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 40 checks:
+  - Red check: `OptionalHeader` accepted timestamp flags without enough optional bytes, allowing `TSTimestamp.decode` to index past the buffer later.
+  - Corpus check: GStreamer PES parsing waits for five PTS bytes, ten PTS/DTS bytes, and treats DTS-only flags as invalid.
+  - Green check: `OptionalHeader` now rejects short PTS fields, short PTS/DTS fields, and invalid DTS-only flags during PES parsing.
+  - Green check: `MpegTsPacketizedElementaryStreamSuite` covers all three malformed timestamp cases and a valid PTS round trip.
+  - Scope check: timestamp encoding, packet lengths, payload assembly, and sample-buffer timestamp wrapping are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter MpegTsPacketizedElementaryStreamSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.40, no affected flows; review context flags shared MPEG-TS parser impact.
