@@ -91,7 +91,7 @@ function StatusTable({ rows }: StatusTableProps) {
             {([name, value]) => (
               <tr class="border-b border-zinc-800">
                 <td class="py-1.5 pr-4 text-zinc-200 font-medium whitespace-nowrap">{name}</td>
-                <td class="py-1.5 text-zinc-200" innerHTML={value} />
+                <td class="py-1.5 text-zinc-200">{value}</td>
               </tr>
             )}
           </For>
