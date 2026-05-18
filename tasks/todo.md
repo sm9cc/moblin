@@ -1293,7 +1293,7 @@ Date: 2026-05-18
 - [x] Patch the defect.
 - [x] Run targeted validation and available repo checks.
 - [x] Review changed diff and impact.
-- [ ] Commit the fix alone.
+- [x] Commit the fix alone.
 
 ### Review
 
@@ -1644,3 +1644,47 @@ Date: 2026-05-18
   - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.35, no affected flows; review context flags shared NAL conversion impact.
+
+## Continued sweep 2026-05-19 adaptive bitrate PIF settings
+
+### Assumptions
+
+- SRT adaptive bitrate settings can be restored from persisted JSON or imported settings, not only from the
+  settings sliders.
+- Fight and RIST adaptive algorithms divide by the configured packets-in-flight threshold during updates.
+- Invalid restored thresholds must not crash the streaming pipeline.
+
+### Acceptance criteria
+
+- Zero packets-in-flight settings do not divide by zero in the SRT Fight algorithm.
+- Negative packets-in-flight settings do not divide by zero in the RIST adaptive algorithm.
+- Valid adaptive bitrate behavior remains unchanged.
+
+### Checklist
+
+- [x] Select high-risk adaptive bitrate settings path using local code and transport-corpus context.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Add focused regression tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [ ] Commit the fix alone.
+
+### Review
+
+- Defect 47 checks:
+  - Red check: restored or imported SRT adaptive bitrate settings could set the packets-in-flight threshold
+    to zero or less, then Fight/RIST update logic divided by that threshold.
+  - Corpus check: SRT stats define in-flight packet count as a sender-side congestion signal, and BELABOX
+    adaptive bitrate uses send-buffer/RTT pressure as the bitrate-control input.
+  - Green check: Fight and RIST adaptive settings now clamp the internal packets-in-flight threshold to at
+    least one before logging and storing the settings.
+  - Green check: `AdaptiveBitrateSuite` covers zero settings for SRT Fight and negative settings for RIST.
+  - Scope check: valid adaptive settings, bitrate math, RTT/PIF smoothing, and BELABOX behavior are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter AdaptiveBitrateSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.40, no affected flows; review context flags adaptive bitrate settings/update
+    test gaps because Swift tests could not run here.

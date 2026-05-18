@@ -22,6 +22,15 @@ private func makeStats(bitrate: Int64) -> StreamStats {
                 relaxed: false)
 }
 
+private func makeSettings(packetsInFlight: Int64) -> AdaptiveBitrateSettings {
+    AdaptiveBitrateSettings(packetsInFlight: packetsInFlight,
+                            rttDiffHighFactor: 0.9,
+                            rttDiffHighAllowedSpike: 50,
+                            rttDiffHighMinDecrease: 250_000,
+                            pifDiffIncreaseFactor: 100_000,
+                            minimumBitrate: 250_000)
+}
+
 private func update(belabox: AdaptiveBitrateSrtBelabox, bitrate: Int64) async throws {
     try await sleep(milliSeconds: 20)
     belabox.update(stats: makeStats(bitrate: bitrate))
@@ -71,5 +80,23 @@ struct AdaptiveBitrateSuite {
                                           relaxed: false))
         #expect(belabox.getCurrentBitrate() == 1_000_000)
         #expect(handler.bitrates.isEmpty)
+    }
+
+    @Test
+    func srtFightClampsZeroPacketsInFlightSettings() {
+        let handler = Handler()
+        let fight = AdaptiveBitrateSrtFight(targetBitrate: 5_000_000, delegate: handler)
+        fight.setSettings(settings: makeSettings(packetsInFlight: 0))
+        fight.update(stats: makeStats(bitrate: 5_000_000))
+        #expect(fight.getCurrentBitrate() >= 250_000)
+    }
+
+    @Test
+    func ristClampsNegativePacketsInFlightSettings() {
+        let handler = Handler()
+        let rist = AdaptiveBitrateRistExperiment(targetBitrate: 5_000_000, delegate: handler)
+        rist.setSettings(settings: makeSettings(packetsInFlight: -1))
+        rist.update(stats: makeStats(bitrate: 5_000_000))
+        #expect(rist.getCurrentBitrate() >= 250_000)
     }
 }

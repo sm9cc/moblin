@@ -34,6 +34,8 @@ class AdaptiveBitrateRistExperiment: AdaptiveBitrate {
     }
 
     override func setSettings(settings: AdaptiveBitrateSettings) {
+        var settings = settings
+        settings.packetsInFlight = max(1, settings.packetsInFlight)
         logger.info("adaptive-bitrate-rist-experiment: Using settings \(settings)")
         self.settings = settings
     }
