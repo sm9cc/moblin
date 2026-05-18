@@ -1014,7 +1014,12 @@ extension RtspClient: RtspTransportDelegate {
         performOptions()
     }
 
-    func rtspTransportDisconnected() {}
+    func rtspTransportDisconnected() {
+        guard started, state != .disconnected else {
+            return
+        }
+        reconnectSoon()
+    }
 
     func rtspTransportReceivedRtspMessage(header: Data, content: Data?) {
         do {

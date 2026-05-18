@@ -559,3 +559,41 @@ Date: 2026-05-18
   - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: low RTSP codec impact, no affected flows, test gap for private codec processors.
+
+## Continued sweep 2026-05-18 RTSP transport disconnect recovery
+
+### Assumptions
+
+- RTSP transport callbacks run on `rtspClientQueue`.
+- Existing reconnect timers define Moblin's RTSP recovery policy.
+- Explicit user stop should not schedule a reconnect.
+
+### Acceptance criteria
+
+- A transport disconnect while the RTSP client is started enters the existing reconnect path.
+- A transport disconnect after explicit stop does nothing.
+- Existing startup timeout and keepalive recovery behavior remain unchanged.
+
+### Checklist
+
+- [x] Select a high-risk RTSP transport recovery path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 22 checks:
+  - Red check: RTSP transports reported disconnects for receive failures and oversized headers, but `RtspClient.rtspTransportDisconnected()` ignored them.
+  - Corpus check: GStreamer RTSP reconnects when the server closes the control connection.
+  - Green check: transport disconnects now enter Moblin's existing `reconnectSoon()` path while the client is started.
+  - Stop check: callbacks after explicit stop or after an already-disconnected reset return without scheduling a reconnect.
+  - Static check: startup timeout and keepalive recovery still call the same reconnect helper as before.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: low RTSP delegate impact, no affected flows, no reported test gaps.
