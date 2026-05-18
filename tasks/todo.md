@@ -255,3 +255,40 @@ Date: 2026-05-18
   - `make lint`: blocked because `swiftlint` is unavailable in this shell.
   - `swift test`: blocked because `swift` is unavailable in this shell.
   - code-review-graph: high RTSP shared-code impact, no affected flows.
+
+## Continued sweep 2026-05-18 MPEG-TS packet size
+
+### Assumptions
+
+- MPEG-TS writer output must keep every TS packet at `MpegTsPacket.size`.
+- Keep the packetizer structure unchanged and fix only the impossible first-packet stuffing condition.
+- Use existing adaptation-field stuffing behavior to fill short PES payloads.
+
+### Acceptance criteria
+
+- A short PES payload that fits in the first packet encodes as one 188-byte TS packet.
+- Existing full first-packet payloads keep their current payload size.
+- No unrelated MPEG-TS writer or reader behavior changes.
+
+### Checklist
+
+- [x] Select a high-risk MPEG-TS writer path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect and add focused tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 14 checks:
+  - Red check: first PES packet stuffing used `payloadOffset > payload.count`, which cannot be true after `min(...)`.
+  - Corpus check: MPEG-TS packets are fixed at 188 bytes, matching `MpegTsPacket.size`.
+  - Green check: first-packet stuffing now fills `maximumPayloadSize - payloadOffset` when the PES payload is short.
+  - Regression coverage: `shortPayloadFirstPacketIsFullSize` verifies a one-packet PES encode has size `MpegTsPacket.size`.
+  - Static check: impossible `payloadOffset > payload.count` condition is gone.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test`: blocked because `swift` is unavailable in this shell.
+  - code-review-graph: high MPEG-TS shared-code impact, no affected flows.
