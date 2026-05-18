@@ -673,3 +673,44 @@ Date: 2026-05-18
   - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: low RTSP parser impact, no affected flows; reported test gap despite the focused parser tests.
+
+## Continued sweep 2026-05-18 RTSP Content-Length validation
+
+### Assumptions
+
+- RTSP response bodies used by Moblin are SDP or small control payloads.
+- A malformed `Content-Length` is a protocol error and should not be treated as an absent body.
+- A one MiB body cap is far above normal SDP sizes while preventing unbounded server-controlled reads.
+
+### Acceptance criteria
+
+- Missing `Content-Length` still means no body.
+- Negative or nonnumeric `Content-Length` values disconnect instead of desynchronizing the RTSP stream parser.
+- Oversized positive `Content-Length` values disconnect before scheduling a body read.
+- Valid RTSP body reads below the cap keep the existing delivery path.
+
+### Checklist
+
+- [x] Select a high-risk RTSP body parser path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Add focused parser tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 25 checks:
+  - Red check: malformed `Content-Length` values were treated as absent bodies, leaving any following bytes to desynchronize the RTSP parser.
+  - Red check: large positive `Content-Length` values scheduled server-controlled body reads with no Moblin cap.
+  - Corpus check: FFmpeg bounds SDP buffers at 16 KiB, and GStreamer exposes a content-length limit before allocating a body buffer.
+  - Green check: malformed content lengths now disconnect, missing content length still means no body, and accepted body reads are capped at one MiB.
+  - Regression coverage: `RtspClientSuite` covers missing, valid, negative, and nonnumeric `Content-Length` parsing.
+  - Static check: TCP and UDP header readers both apply the same parser and cap before `receiveRtspContent`.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: low RTSP body parser impact, no affected flows; reported test gap for private receive callbacks.

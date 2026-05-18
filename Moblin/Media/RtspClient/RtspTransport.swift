@@ -3,6 +3,7 @@ import Network
 
 private let rtspEndOfHeaders = Data([0xD, 0xA, 0xD, 0xA])
 private let rtspMaxHeaderSize = 64 * 1024
+private let rtspMaxContentSize = 1024 * 1024
 
 protocol RtspTransportDelegate: AnyObject {
     func rtspTransportConnected()
@@ -149,7 +150,12 @@ class RtspTransportRtpRtspTcp: RtspTransport, @unchecked Sendable {
                 return
             }
             if header.suffix(4) == rtspEndOfHeaders {
-                let contentLength = parseContentLength(from: header)
+                guard let contentLength = parseContentLength(from: header),
+                      contentLength <= rtspMaxContentSize
+                else {
+                    delegate?.rtspTransportDisconnected()
+                    return
+                }
                 if contentLength > 0 {
                     receiveRtspContent(header: header, size: contentLength)
                 } else {
@@ -371,7 +377,12 @@ class RtspTransportRtpUdp: RtspTransport, @unchecked Sendable {
                 return
             }
             if header.suffix(4) == rtspEndOfHeaders {
-                let contentLength = parseContentLength(from: header)
+                guard let contentLength = parseContentLength(from: header),
+                      contentLength <= rtspMaxContentSize
+                else {
+                    delegate?.rtspTransportDisconnected()
+                    return
+                }
                 if contentLength > 0 {
                     receiveRtspContent(header: header, size: contentLength)
                 } else {
@@ -410,19 +421,21 @@ class RtspTransportRtpUdp: RtspTransport, @unchecked Sendable {
     }
 }
 
-private func parseContentLength(from header: Data) -> Int {
+func parseContentLength(from header: Data) -> Int? {
     guard let header = String(bytes: header, encoding: .utf8) else {
-        return 0
+        return nil
     }
     for line in header.split(separator: "\r\n") {
         let lower = line.lowercased()
         if lower.starts(with: "content-length:") {
             let parts = lower.split(separator: ":", maxSplits: 1)
             if parts.count == 2,
-               let length = Int(parts[1].trimmingCharacters(in: .whitespaces))
+               let length = Int(parts[1].trimmingCharacters(in: .whitespaces)),
+               length >= 0
             {
                 return length
             }
+            return nil
         }
     }
     return 0

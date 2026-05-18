@@ -32,6 +32,26 @@ struct RtspClientSuite {
     }
 
     @Test
+    func parseMissingContentLength() {
+        #expect(parseContentLength(from: "RTSP/1.0 200 OK\r\n\r\n".utf8Data) == 0)
+    }
+
+    @Test
+    func parseValidContentLength() {
+        #expect(parseContentLength(from: "RTSP/1.0 200 OK\r\nContent-Length: 12\r\n\r\n".utf8Data) == 12)
+    }
+
+    @Test
+    func rejectNegativeContentLength() {
+        #expect(parseContentLength(from: "RTSP/1.0 200 OK\r\nContent-Length: -1\r\n\r\n".utf8Data) == nil)
+    }
+
+    @Test
+    func rejectNonnumericContentLength() {
+        #expect(parseContentLength(from: "RTSP/1.0 200 OK\r\nContent-Length: nope\r\n\r\n".utf8Data) == nil)
+    }
+
+    @Test
     func normalizeRtpPacketSkipsCsrcAndExtension() throws {
         let packet = Data([
             0x91, 0x60, 0x00, 0x02, 0x00, 0x00, 0x00, 0x10,
