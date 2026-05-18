@@ -446,3 +446,40 @@ Date: 2026-05-18
   - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: high SRTLA shared-code impact, no affected flows.
+
+## Continued sweep 2026-05-18 SRTLA server connection handoff
+
+### Assumptions
+
+- `SrtlaServerClientConnection` must not receive packets until its delegate is installed.
+- Keep ownership and receive-loop behavior unchanged after startup.
+- The only construction path is `SrtlaServerClient.addConnection`.
+
+### Acceptance criteria
+
+- A newly registered SRTLA connection starts receiving only after `delegate` is set.
+- Existing duplicate connection checks and connection tracking remain unchanged.
+- No receive-loop behavior changes after `start()` is called.
+
+### Checklist
+
+- [x] Select a high-risk SRTLA connection handoff path using local code plus transport references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 19 checks:
+  - Red check: `SrtlaServerClientConnection.init` started `receivePackets()` before `SrtlaServerClient.addConnection` assigned `delegate`.
+  - Corpus check: SRTLA data packets are forwarded immediately after registration, so the handoff must be ready before receiving.
+  - Green check: `start()` now begins the receive loop after the delegate is installed and the connection is stored.
+  - Static check: the only construction path calls `connection.delegate = self`, appends the connection, then calls `connection.start()`.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: high SRTLA server impact, no affected flows.

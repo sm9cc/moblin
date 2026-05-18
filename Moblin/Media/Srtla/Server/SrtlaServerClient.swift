@@ -141,6 +141,7 @@ class SrtlaServerClient: @unchecked Sendable {
         let connection = SrtlaServerClientConnection(connection: connection)
         connection.delegate = self
         connections.append(connection)
+        connection.start()
         logger.info("srtla-server-client: Added connection. Using \(connections.count) connection(s)")
     }
 

@@ -42,6 +42,9 @@ class SrtlaServerClientConnection: @unchecked Sendable {
 
     init(connection: NWConnection) {
         self.connection = connection
+    }
+
+    func start() {
         receivePackets()
     }
 
