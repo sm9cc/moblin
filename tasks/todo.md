@@ -216,3 +216,42 @@ Date: 2026-05-18
   - `swift test`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: unavailable in this shell.
   - code-review-graph: high shared-code impact, no affected flows.
+
+## Continued sweep 2026-05-18 RTP headers
+
+### Assumptions
+
+- Keep existing H264/H265 RTP payload processors on their fixed 12-byte-header contract.
+- Normalize valid variable-length RTP headers before those processors receive packets.
+- Reject malformed RTP extension and padding lengths instead of passing corrupt payloads downstream.
+
+### Acceptance criteria
+
+- RTP packets with CSRC entries or header extensions are accepted when their lengths are valid.
+- Existing fixed-header RTP packets keep the old packet shape.
+- Padding bytes are stripped before video payload processing.
+- Malformed empty-payload packets fail before H264/H265 payload indexing.
+
+### Checklist
+
+- [x] Select a high-risk RTSP/RTP parser path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect and add focused tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 13 checks:
+  - Red check: RTSP RTP receive path rejected valid RTP packets with `X` or `CC` bits set.
+  - Corpus check: RTP references compute payload offset from CSRC count plus extension header length.
+  - Green check: `normalizeRtpPacket` strips CSRC, extension, and padding before fixed-header H264/H265 processors run.
+  - Malformed-input guard: RTP packets with no payload after extension or padding now fail before payload indexing.
+  - Regression coverage: `RtspClientSuite` covers CSRC plus extension normalization and padding stripping.
+  - Static check: old `Unsupported x` and `Unsupported cc` guards are gone.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test`: blocked because `swift` is unavailable in this shell.
+  - code-review-graph: high RTSP shared-code impact, no affected flows.

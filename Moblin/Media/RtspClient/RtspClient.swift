@@ -500,6 +500,59 @@ private class RtpProcessorVideoH265: RtpVideoProcessor {
     }
 }
 
+private let rtpHeaderSize = 12
+private let rtpCsrcSize = 4
+private let rtpExtensionHeaderSize = 4
+
+func normalizeRtpPacket(packet: Data) throws -> Data {
+    guard packet.count >= rtpHeaderSize else {
+        throw "Packet shorter than 12 bytes: \(packet)"
+    }
+    let value = packet[0]
+    let version = value >> 6
+    let hasPadding = (value & 0x20) != 0
+    let hasExtension = (value & 0x10) != 0
+    let csrcCount = Int(value & 0xF)
+    guard version == 2 else {
+        throw "Unsupported version \(version)"
+    }
+    var payloadOffset = rtpHeaderSize + csrcCount * rtpCsrcSize
+    guard packet.count >= payloadOffset else {
+        throw "Packet shorter than RTP header: \(packet)"
+    }
+    if hasExtension {
+        guard packet.count >= payloadOffset + rtpExtensionHeaderSize else {
+            throw "Packet shorter than RTP extension header: \(packet)"
+        }
+        let extensionLength = Int(packet[payloadOffset + 2]) << 8 | Int(packet[payloadOffset + 3])
+        let extensionPayloadSize = extensionLength * 4
+        payloadOffset += rtpExtensionHeaderSize + extensionPayloadSize
+        guard packet.count >= payloadOffset else {
+            throw "Packet shorter than RTP extension: \(packet)"
+        }
+    }
+    var payloadEnd = packet.count
+    if hasPadding {
+        guard let paddingLength = packet.last, paddingLength > 0 else {
+            throw "Invalid RTP padding length"
+        }
+        guard Int(paddingLength) <= payloadEnd - payloadOffset else {
+            throw "RTP padding exceeds payload"
+        }
+        payloadEnd -= Int(paddingLength)
+    }
+    guard payloadOffset < payloadEnd else {
+        throw "RTP packet has no payload"
+    }
+    if payloadOffset == rtpHeaderSize, payloadEnd == packet.count {
+        return packet
+    }
+    var normalized = Data(packet[..<rtpHeaderSize])
+    normalized[0] = packet[0] & 0xC0
+    normalized += packet[payloadOffset ..< payloadEnd]
+    return normalized
+}
+
 private class Rtp {
     private var nextExpectedSequenceNumber: UInt16?
     private var reorderBuffer: [UInt16: Data] = [:]
@@ -511,24 +564,9 @@ private class Rtp {
         maximumTimestamp: CMTime(seconds: 0x1_0000_0000)
     )
 
-    func handlePacket(packet: Data) throws {
-        guard packet.count >= 12 else {
-            throw "Packet shorter than 12 bytes: \(packet)"
-        }
-        let value = packet[0]
-        let version = value >> 6
-        let x = (value >> 4) & 0x1
-        let cc = value & 0xF
+    func handlePacket(packet inputPacket: Data) throws {
+        let packet = try normalizeRtpPacket(packet: inputPacket)
         let sequenceNumber = UInt16(packet[2]) << 8 | UInt16(packet[3])
-        guard version == 2 else {
-            throw "Unsupported version \(version)"
-        }
-        guard x == 0 else {
-            throw "Unsupported x \(x)"
-        }
-        guard cc == 0 else {
-            throw "Unsupported cc \(cc)"
-        }
         if nextExpectedSequenceNumber == nil {
             nextExpectedSequenceNumber = sequenceNumber
         }
