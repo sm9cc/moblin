@@ -18,6 +18,20 @@ struct RtspClientSuite {
     }
 
     @Test
+    func udpTransportAcceptsValidServerPorts() throws {
+        let transport = RtspTransportRtpUdp()
+        try transport.handleSetupTransportResponse("RTP/AVP;unicast;server_port=5004-5005")
+    }
+
+    @Test
+    func udpTransportRejectsInvalidRtpServerPort() {
+        let transport = RtspTransportRtpUdp()
+        #expect(throws: "Invalid RTP or RTCP server port in: RTP/AVP;unicast;server_port=999999-5005") {
+            try transport.handleSetupTransportResponse("RTP/AVP;unicast;server_port=999999-5005")
+        }
+    }
+
+    @Test
     func normalizeRtpPacketSkipsCsrcAndExtension() throws {
         let packet = Data([
             0x91, 0x60, 0x00, 0x02, 0x00, 0x00, 0x00, 0x10,

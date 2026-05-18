@@ -245,10 +245,11 @@ class RtspTransportRtpUdp: RtspTransport, @unchecked Sendable {
         guard let match = value.firstMatch(of: /server_port=(\d+)-(\d+)/) else {
             throw "Missing server_port in UDP transport response: \(value)"
         }
-        guard let rtcpPortValue = UInt16(match.output.2),
+        guard UInt16(match.output.1) != nil,
+              let rtcpPortValue = UInt16(match.output.2),
               let nwPort = NWEndpoint.Port(rawValue: rtcpPortValue)
         else {
-            throw "Invalid RTCP server port in: \(value)"
+            throw "Invalid RTP or RTCP server port in: \(value)"
         }
         remoteRtcpPort = nwPort
     }

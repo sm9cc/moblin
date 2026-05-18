@@ -635,3 +635,41 @@ Date: 2026-05-18
   - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: low RTSP parser impact, no affected flows; reported test gap despite the focused parser tests.
+
+## Continued sweep 2026-05-18 RTSP UDP server port validation
+
+### Assumptions
+
+- RTSP/UDP setup responses must provide numeric RTP and RTCP server ports.
+- Moblin only sends RTCP back to the server port today, but accepting an invalid RTP half hides malformed transport negotiation.
+- Rejecting malformed setup responses should happen before the client enters playback.
+
+### Acceptance criteria
+
+- Valid `server_port=5004-5005` setup responses still parse.
+- Out-of-range RTP server ports throw during UDP setup response handling.
+- RTCP send port assignment remains unchanged for valid responses.
+
+### Checklist
+
+- [x] Select a high-risk RTSP UDP setup parser path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Add focused parser tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 24 checks:
+  - Red check: `RtspTransportRtpUdp.handleSetupTransportResponse()` validated only the RTCP half of `server_port=rtp-rtcp`.
+  - Corpus check: GStreamer parses and validates the whole `server_port` range before accepting an RTSP transport response.
+  - Green check: UDP setup now rejects responses where either RTP or RTCP server port cannot fit a valid 16-bit port.
+  - Regression coverage: `RtspClientSuite` covers a valid `server_port=5004-5005` response and rejects `server_port=999999-5005`.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtspClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: low RTSP parser impact, no affected flows; reported test gap despite the focused parser tests.
