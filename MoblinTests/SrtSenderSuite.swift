@@ -83,9 +83,9 @@ struct SrtSenderSuite {
         let model = ModelMock()
         sender.delegate = model
         sender.start()
-        _ = await checkInductionHandshake(packet: model.waitForPacket())
+        let socketId = await checkInductionHandshake(packet: model.waitForPacket())
         try sender.input(packet: createInductionHandshake())
-        _ = await checkConclusionHandshake(packet: model.waitForPacket())
+        _ = await checkConclusionHandshake(packet: model.waitForPacket(), socketId: socketId)
         try sender.input(packet: createConclusionHandshake())
         await model.waitForConnected()
         sender.send(now: .now.advanced(by: .seconds(6)))
@@ -114,9 +114,9 @@ struct SrtSenderSuite {
 
     private func connect(sender: SrtSender, model: ModelMock) async throws {
         sender.start()
-        _ = await checkInductionHandshake(packet: model.waitForPacket())
+        let socketId = await checkInductionHandshake(packet: model.waitForPacket())
         try sender.input(packet: createInductionHandshake())
-        _ = await checkConclusionHandshake(packet: model.waitForPacket())
+        _ = await checkConclusionHandshake(packet: model.waitForPacket(), socketId: socketId)
         try sender.input(packet: createConclusionHandshake())
         await model.waitForConnected()
     }
@@ -146,15 +146,17 @@ struct SrtSenderSuite {
         return sequenceNumber
     }
 
-    private func checkInductionHandshake(packet: String) -> (UInt32, UInt32) {
+    private func checkInductionHandshake(packet: String) -> UInt32 {
         #expect(packet.count == 128)
         #expect(packet.substring(begin: 0, end: 16) == "8000000000000000")
-        let timestamp = UInt32(packet.substring(begin: 16, end: 24), radix: 16)!
+        _ = UInt32(packet.substring(begin: 16, end: 24), radix: 16)!
         #expect(packet.substring(begin: 24, end: 48) == "000000000000000400000002")
-        let sequenceNumber = UInt32(packet.substring(begin: 48, end: 56), radix: 16)!
+        _ = UInt32(packet.substring(begin: 48, end: 56), radix: 16)!
         #expect(packet.substring(begin: 56, end: 80) == "000005dc0000200000000001")
+        let socketId = UInt32(packet.substring(begin: 80, end: 88), radix: 16)!
+        #expect(socketId != 0)
         #expect(packet.substring(begin: 88, end: 128) == "000000000100007f000000000000000000000000")
-        return (timestamp, sequenceNumber)
+        return socketId
     }
 
     private func createInductionHandshake() throws -> Data {
@@ -172,17 +174,18 @@ struct SrtSenderSuite {
         return packet
     }
 
-    private func checkConclusionHandshake(packet: String) -> (UInt32, UInt32) {
+    private func checkConclusionHandshake(packet: String, socketId: UInt32) -> (UInt32, UInt32) {
         #expect(packet.count == 176)
         #expect(packet.substring(begin: 0, end: 16) == "8000000000000000")
         let timestamp = UInt32(packet.substring(begin: 16, end: 24), radix: 16)!
-        #expect(packet.substring(begin: 24, end: 48) == "000000000000000500000005")
+        #expect(packet.substring(begin: 24, end: 48) == "2ab1f77c0000000500000005")
         let sequenceNumber = UInt32(packet.substring(begin: 48, end: 56), radix: 16)!
-        #expect(packet
-            .substring(begin: 56, end: 176) ==
+        #expect(packet.substring(begin: 56, end: 80) == "000005dc00002000ffffffff")
+        #expect(UInt32(packet.substring(begin: 80, end: 88), radix: 16)! == socketId)
+        #expect(packet.substring(begin: 88, end: 176) ==
             """
-            000005dc00002000ffffffff2ab1f77c000000000100007f000000000000\
-            0000000000000001000300010503000000bf07d007d00005000134333231
+            000000000100007f00000000000000000000000000010003000105030000\
+            00bf07d007d00005000134333231
             """)
         return (timestamp, sequenceNumber)
     }

@@ -1732,3 +1732,51 @@ Date: 2026-05-18
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.35, no affected flows; review context flags SRT sender/test gaps because Swift
     tests could not run here.
+
+## Continued sweep 2026-05-19 SRT conclusion handshake IDs
+
+### Assumptions
+
+- Moblin's SRT sender is the caller during SRTLA setup.
+- In a caller conclusion handshake, the control header destination is the listener socket ID received during
+  induction.
+- The handshake body ID remains the caller's socket ID.
+
+### Acceptance criteria
+
+- The SRT conclusion control header uses the listener socket ID as destination.
+- The SRT conclusion body uses the same caller socket ID sent in induction.
+- Existing handshake, ACK, NAK, and stream ID extension behavior remains unchanged.
+
+### Checklist
+
+- [x] Select high-risk SRT handshake path using local code and transport-corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Add focused regression expectations.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 49 checks:
+  - Red check: Moblin's SRT conclusion handshake sent destination socket ID `0` in the control header and
+    put the listener socket ID in the handshake body `ID` field.
+  - Corpus check: SRT handshake docs say caller conclusion uses the listener socket ID as `PH_ID`
+    destination and the caller socket ID as the handshake body `ID`.
+  - Corpus check: the SRT reference implementation starts socket IDs from a random value, matching Moblin's
+    existing randomized caller ID behavior.
+  - Green check: conclusion handshake creation now writes the peer socket ID to the control header destination
+    and the sender's socket ID to the body `ID` field.
+  - Green check: `SrtSenderSuite` now captures the induction caller socket ID and requires the conclusion body
+    to reuse it while the header destination is the fixture listener socket ID.
+  - Scope check: induction handshake fields, stream ID extension, data packet destination IDs, ACK handling,
+    NAK handling, and SRTLA packet routing are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.35, no affected flows; review context flags SRT sender/test gaps because Swift
+    tests could not run here.

@@ -7,7 +7,6 @@ private let srtHandshakeVersion5: UInt32 = 5
 private let srtDestinationSocket: UInt32 = 0
 private let srtMaximumTransmissionUnitSize: UInt32 = 1500
 private let srtMaximumFlowWindowSizeInPackets: UInt32 = 8192
-private let srtSocketId: UInt32 = .random(in: 1 ... UInt32.max)
 private let srtIpUdpHeaderSize: UInt64 = 28
 
 private class SrtClock {
@@ -195,6 +194,7 @@ class SrtSender: @unchecked Sendable {
     private var rttUs: UInt32 = 0
     private var mbpsSendRate: Double = 0.0
     private var latestOutputPacketsTime = ContinuousClock.now
+    private let srtSocketId: UInt32 = .random(in: 1 ... UInt32.max)
     private let ackAckPacket = AckAckPacket()
     private let keepAlivePacket = KeepAlivePacket()
     private let latency: UInt16
@@ -414,7 +414,7 @@ class SrtSender: @unchecked Sendable {
         writer.writeBytes(createCommonControlPacketHeader(type: .handshake,
                                                           typeSpecificInformation: 0,
                                                           timestamp: clock.timestamp(),
-                                                          destinationSocketId: srtDestinationSocket))
+                                                          destinationSocketId: peerSocketId))
         writer.writeUInt32(srtHandshakeVersion5)
         writer.writeUInt16(0)
         writer.writeUInt16(5)
@@ -422,7 +422,7 @@ class SrtSender: @unchecked Sendable {
         writer.writeUInt32(srtMaximumTransmissionUnitSize)
         writer.writeUInt32(srtMaximumFlowWindowSizeInPackets)
         writer.writeUInt32(HandshakeType.conclusion.rawValue)
-        writer.writeUInt32(peerSocketId)
+        writer.writeUInt32(srtSocketId)
         writer.writeUInt32(synCookie)
         writer.writeBytes(Data([1, 0, 0, 127,
                                 0, 0, 0, 0,
