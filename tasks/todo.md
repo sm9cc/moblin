@@ -1153,3 +1153,43 @@ Date: 2026-05-18
   - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: medium working-tree risk, low review-context risk, no affected flows; reported existing private SRTLA receive test gaps.
+
+## Continued sweep 2026-05-18 Enhanced RTMP AVC ingest
+
+### Assumptions
+
+- Enhanced RTMP video packets with `avc1` carry AVC decoder configuration and AVC samples.
+- Enhanced RTMP video packets with `hvc1` keep the existing HEVC behavior.
+- Unsupported Enhanced RTMP codecs should still be rejected.
+
+### Acceptance criteria
+
+- Enhanced RTMP `avc1` packets are mapped to AVC instead of disconnecting as unsupported.
+- Enhanced RTMP `hvc1` packets keep the existing HEVC sequence-start and frame handling.
+- Unsupported Enhanced RTMP fourCC values still stop the client.
+- The fix stays confined to codec mapping and server-side Enhanced RTMP parsing.
+
+### Checklist
+
+- [x] Select high-risk RTMP codec ingest path using local code and transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 37 checks:
+  - Red check: `processMessageVideoExtendedHeader` rejected every Enhanced RTMP fourCC except `hvc1`, so valid `avc1` publishers were disconnected.
+  - Corpus check: MistServer maps Enhanced RTMP `avc1` to H264 and handles `avc1` and `hvc1` with the same Enhanced CodedFrames offsets.
+  - Green check: Enhanced RTMP fourCC values now map through `FlvVideoFourCC.codec`, so `avc1` uses the AVC config path and `hvc1` keeps the HEVC path.
+  - Green check: `RtmpSuite.enhancedVideoFourCcCodecMapping` covers the `avc1` and `hvc1` codec mapping.
+  - Scope check: unsupported Enhanced RTMP fourCC values are still rejected before codec mapping.
+  - `git diff --check`: pass.
+  - whole-file line-width scan found an existing 115-character line in `RtmpServerChunkStream.swift`; changed lines were manually reviewed for width.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtmpSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.35, no affected flows; review context flags shared FLV enum impact.

@@ -475,13 +475,10 @@ class RtmpServerChunkStream: @unchecked Sendable {
             client.stopInternal(reason: "Unsupported fourCC \(fourCc)")
             return
         }
-        guard fourCc == .hevc else {
-            client.stopInternal(reason: "Unsupported fourCC \(fourCc).")
-            return
-        }
+        let format = fourCc.codec
         switch packetType {
         case .sequenceStart:
-            processMessageVideoTypeSequenceStart(client: client)
+            processMessageVideoTypeSeq(client: client, format: format)
         case .codedFrames:
             processMessageVideoTypeCodedFrames(client: client, isKeyFrame: videoType == .key)
         case .sequenceEnd:
@@ -508,20 +505,6 @@ class RtmpServerChunkStream: @unchecked Sendable {
             setupVideoEncoderIfNeeded(formatDescription: formatDescription)
         } else {
             client.stopInternal(reason: "\(format.toString()) format description error \(status)")
-        }
-    }
-
-    private func processMessageVideoTypeSequenceStart(client: RtmpServerClient) {
-        guard checkMessageBodyBigEnough(client: client, minimumSize: FlvTagType.video.headerSize) else {
-            return
-        }
-        let hvcC = messageBody.subdata(in: FlvTagType.video.headerSize ..< messageBody.count)
-        let videoConfig = MpegTsVideoConfigHevc(hvcC: hvcC)
-        let status = videoConfig.makeFormatDescription(&formatDescription)
-        if status == noErr {
-            setupVideoEncoderIfNeeded(formatDescription: formatDescription)
-        } else {
-            client.stopInternal(reason: "H.265/HEVC format description error \(status)")
         }
     }
 

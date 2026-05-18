@@ -53,4 +53,10 @@ struct RtmpSuite {
         #expect(!isValidRtmpChunkSize(0x8000_0000))
         #expect(!isValidRtmpChunkSize(0xFFFF_FFFF))
     }
+
+    @Test
+    func enhancedVideoFourCcCodecMapping() {
+        #expect(FlvVideoFourCC.avc1.codec == .avc)
+        #expect(FlvVideoFourCC.hevc.codec == .hevc)
+    }
 }

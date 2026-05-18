@@ -80,6 +80,15 @@ enum FlvVideoCodec: UInt8 {
 enum FlvVideoFourCC: UInt32 {
     case avc1 = 0x6176_6331 // {'a', 'v', 'c', '1'}
     case hevc = 0x6876_6331 // { 'h', 'v', 'c', '1' }
+
+    var codec: FlvVideoCodec {
+        switch self {
+        case .avc1:
+            .avc
+        case .hevc:
+            .hevc
+        }
+    }
 }
 
 enum FlvVideoPacketType: UInt8 {
