@@ -2,6 +2,7 @@ import Foundation
 import Network
 
 private let rtspEndOfHeaders = Data([0xD, 0xA, 0xD, 0xA])
+private let rtspMaxHeaderSize = 64 * 1024
 
 protocol RtspTransportDelegate: AnyObject {
     func rtspTransportConnected()
@@ -138,6 +139,10 @@ class RtspTransportRtpRtspTcp: RtspTransport, @unchecked Sendable {
                 return
             }
             header += data
+            guard header.count <= rtspMaxHeaderSize else {
+                delegate?.rtspTransportDisconnected()
+                return
+            }
             if header.suffix(4) == rtspEndOfHeaders {
                 let contentLength = parseContentLength(from: header)
                 if contentLength > 0 {
@@ -355,6 +360,10 @@ class RtspTransportRtpUdp: RtspTransport, @unchecked Sendable {
                 return
             }
             header += data
+            guard header.count <= rtspMaxHeaderSize else {
+                delegate?.rtspTransportDisconnected()
+                return
+            }
             if header.suffix(4) == rtspEndOfHeaders {
                 let contentLength = parseContentLength(from: header)
                 if contentLength > 0 {
