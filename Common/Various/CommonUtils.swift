@@ -448,27 +448,27 @@ extension Data {
     }
 
     mutating func setUInt16Be(value: UInt16, offset: Int = 0) {
-        withUnsafeMutableBytes { data in data.storeBytes(
-            of: value.bigEndian,
-            toByteOffset: offset,
-            as: UInt16.self
-        ) }
+        self[offset] = UInt8((value >> 8) & 0xFF)
+        self[offset + 1] = UInt8(value & 0xFF)
     }
 
     mutating func setUInt32Be(value: UInt32, offset: Int = 0) {
-        withUnsafeMutableBytes { data in data.storeBytes(
-            of: value.bigEndian,
-            toByteOffset: offset,
-            as: UInt32.self
-        ) }
+        self[offset] = UInt8((value >> 24) & 0xFF)
+        self[offset + 1] = UInt8((value >> 16) & 0xFF)
+        self[offset + 2] = UInt8((value >> 8) & 0xFF)
+        self[offset + 3] = UInt8(value & 0xFF)
     }
 
     mutating func setInt64Be(value: Int64, offset: Int = 0) {
-        withUnsafeMutableBytes { data in data.storeBytes(
-            of: value.bigEndian,
-            toByteOffset: offset,
-            as: Int64.self
-        ) }
+        let value = UInt64(bitPattern: value)
+        self[offset] = UInt8((value >> 56) & 0xFF)
+        self[offset + 1] = UInt8((value >> 48) & 0xFF)
+        self[offset + 2] = UInt8((value >> 40) & 0xFF)
+        self[offset + 3] = UInt8((value >> 32) & 0xFF)
+        self[offset + 4] = UInt8((value >> 24) & 0xFF)
+        self[offset + 5] = UInt8((value >> 16) & 0xFF)
+        self[offset + 6] = UInt8((value >> 8) & 0xFF)
+        self[offset + 7] = UInt8(value & 0xFF)
     }
 
     func makeBlockBuffer(advancedBy: Int = 0) -> CMBlockBuffer? {

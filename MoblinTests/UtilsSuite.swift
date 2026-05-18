@@ -110,4 +110,28 @@ struct UtilsSuite {
         let data = Data([0x00, 0x12, 0x34, 0x56, 0x78])
         #expect(data.getUInt32Be(offset: 1) == 0x12345678)
     }
+
+    @Test
+    func setUInt16BeWithOffset() {
+        var data = Data(repeating: 0, count: 3)
+        data.setUInt16Be(value: 0x1234, offset: 1)
+        #expect(data == Data([0x00, 0x12, 0x34]))
+    }
+
+    @Test
+    func setUInt32BeWithOffset() {
+        var data = Data(repeating: 0, count: 5)
+        data.setUInt32Be(value: 0x12345678, offset: 1)
+        #expect(data == Data([0x00, 0x12, 0x34, 0x56, 0x78]))
+    }
+
+    @Test
+    func setInt64BeWithOffset() {
+        var data = Data(repeating: 0, count: 10)
+        data.setInt64Be(value: 0x0102030405060708, offset: 2)
+        #expect(data == Data([
+            0x00, 0x00, 0x01, 0x02, 0x03,
+            0x04, 0x05, 0x06, 0x07, 0x08,
+        ]))
+    }
 }

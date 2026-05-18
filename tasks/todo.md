@@ -369,3 +369,41 @@ Date: 2026-05-18
   - `swift test --filter UtilsSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: high shared-helper impact, no affected flows.
+
+## Continued sweep 2026-05-18 unaligned packet writes
+
+### Assumptions
+
+- `Data` packet buffers are not guaranteed to be aligned for typed integer stores.
+- SRTLA keepalive writes an `Int64` at offset 2, so typed stores can fail in live use.
+- Keep the helper API unchanged and update only big-endian packet writers.
+
+### Acceptance criteria
+
+- 16-bit, 32-bit, and 64-bit big-endian writes work at non-zero offsets without typed stores.
+- Existing encoded big-endian byte order is unchanged.
+- SRTLA keepalive packet construction keeps the same layout.
+
+### Checklist
+
+- [x] Select the paired high-risk packet write helper path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect and add focused tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 17 checks:
+  - Red check: `setUInt16Be`, `setUInt32Be`, and `setInt64Be` used typed `storeBytes`; SRTLA keepalive writes `Int64` at offset 2.
+  - Corpus check: SRT and SRTLA packet fields are byte-addressed network-order fields, not aligned Swift integers.
+  - Green check: all three setters now write big-endian bytes directly.
+  - Regression coverage: `UtilsSuite` covers 16-bit, 32-bit, and 64-bit big-endian writes at non-zero offsets.
+  - Static check: no `storeBytes` remains in `CommonUtils` packet integer setters.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter UtilsSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: high shared-helper impact, no affected flows.
