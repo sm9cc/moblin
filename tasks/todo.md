@@ -483,3 +483,40 @@ Date: 2026-05-18
   - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: high SRTLA server impact, no affected flows.
+
+## Continued sweep 2026-05-18 SRTLA local short packet guard
+
+### Assumptions
+
+- Local SRT server packets still pass through the same SRT header helpers as remote SRTLA packets.
+- Packets shorter than the SRT control type field are malformed and should be dropped.
+- Keep ACK, NAK, data, and forwarding behavior unchanged for valid packets.
+
+### Acceptance criteria
+
+- `SrtlaServerClient` does not read the SRT control packet type from fewer than two bytes.
+- Existing data packet, ACK, NAK, and default forwarding paths are unchanged for valid packets.
+- The fix matches the boundary checks already used by the SRTLA listener and remote connection paths.
+
+### Checklist
+
+- [x] Select a high-risk local SRT handoff path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 20 checks:
+  - Red check: `handlePacketFromLocalSrtServer` read the SRT control packet type without first proving two bytes exist.
+  - Corpus check: BELABOX SRTLA `get_srt_type()` returns before reading when the packet is shorter than the type field.
+  - Green check: the local SRT callback now drops packets shorter than `srtControlTypeSize`, matching the SRTLA listener and remote connection guard pattern.
+  - Static check: valid data packets, ACKs, NAKs, and default forwarding still use the same branches after the new guard.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: low SRTLA callback impact, no affected flows, test gap for private `NWConnection` callback.
