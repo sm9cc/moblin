@@ -368,6 +368,16 @@ struct RtmpStreamSuite {
         #expect(message.arguments.count == 1)
         #expect(message.arguments[0] == .number(1))
     }
+
+    @Test
+    func extendedChunkStreamIdUsesLittleEndian() {
+        let message = RtmpAcknowledgementMessage()
+        message.sequence = 1
+        let data = RtmpChunk(type: .zero, chunkStreamId: 400, message: message).encode()
+        #expect(data.subdata(in: 0 ..< 3) == Data([0x01, 0x50, 0x01]))
+        let chunk = RtmpChunk(data: data, size: data.count)
+        #expect(chunk?.chunkStreamId == 400)
+    }
 }
 
 private func receiveC0C1(server: RtmpServerMock) async -> Data {

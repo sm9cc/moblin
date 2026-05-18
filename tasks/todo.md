@@ -870,3 +870,41 @@ Date: 2026-05-18
   - `swift test --filter RtmpSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: low working-tree risk with one reported test gap on a nearby function, and no affected flows.
+
+## Continued sweep 2026-05-18 RTMP extended chunk stream ID endian
+
+### Assumptions
+
+- RTMP 3-byte basic headers encode chunk stream IDs above 319 as little-endian `chunkStreamId - 64`.
+- The existing 1-byte and 2-byte basic header paths should remain unchanged.
+- A byte-level unit test is enough to cover this framing rule.
+
+### Acceptance criteria
+
+- Encoding chunk stream ID 400 produces the extended basic header bytes `0x01 0x50 0x01`.
+- Decoding those bytes recovers chunk stream ID 400.
+- Existing lower chunk stream ID encoding is untouched.
+
+### Checklist
+
+- [x] Select a high-risk RTMP chunk framing path using local code plus transport corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Add focused tests.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 30 checks:
+  - Red check: RTMP 3-byte basic headers encoded and decoded `chunkStreamId - 64` as big-endian, so valid chunk stream IDs above 319 were put on the wire in the wrong byte order.
+  - Corpus check: FFmpeg writes extended RTMP channel IDs with `bytestream_put_le16` and reads them with `AV_RL16`.
+  - Green check: extended chunk stream IDs now encode the low byte first and decode with `readUInt16Le()`.
+  - Regression coverage: `RtmpStreamSuite.extendedChunkStreamIdUsesLittleEndian` checks the exact bytes for chunk stream ID 400 and verifies decoding recovers 400.
+  - `git diff --check`: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter RtmpStreamSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: low working-tree risk with no affected flows; reported static test gaps for the changed RTMP chunk entities despite the focused test.

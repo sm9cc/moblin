@@ -30,7 +30,12 @@ enum RtmpChunkType: UInt8 {
         if chunkStreamId <= 319 {
             return Data([rawValue << 6 | 0b0000000, UInt8(chunkStreamId - 64)])
         }
-        return Data([rawValue << 6 | 0b0000_0001] + (chunkStreamId - 64).bigEndian.data)
+        let encodedChunkStreamId = chunkStreamId - 64
+        return Data([
+            rawValue << 6 | 0b0000_0001,
+            UInt8(encodedChunkStreamId & 0xFF),
+            UInt8((encodedChunkStreamId >> 8) & 0xFF),
+        ])
     }
 }
 
@@ -193,7 +198,7 @@ final class RtmpChunk {
         case 0:
             chunkStreamId = try UInt16(reader.readUInt8()) + 64
         case 1:
-            chunkStreamId = try reader.readUInt16() + 64
+            chunkStreamId = try reader.readUInt16Le() + 64
         default:
             break
         }
