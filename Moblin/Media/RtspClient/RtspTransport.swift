@@ -163,8 +163,9 @@ class RtspTransportRtpRtspTcp: RtspTransport, @unchecked Sendable {
     }
 
     private func receive(size: Int, onComplete: @escaping @Sendable (Data) throws -> Void) {
-        connection?.receive(minimumIncompleteLength: size, maximumLength: size) { data, _, _, _ in
-            guard let data else {
+        connection?.receive(minimumIncompleteLength: size, maximumLength: size) { [weak self] data, _, _, error in
+            guard let data, error == nil, data.count == size else {
+                self?.delegate?.rtspTransportDisconnected()
                 return
             }
             do {
