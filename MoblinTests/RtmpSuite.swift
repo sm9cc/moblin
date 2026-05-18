@@ -38,4 +38,10 @@ struct RtmpSuite {
         #expect(streamUrl == "rtmp://foo.com/live")
         #expect(streamKey == "g:3234234?key=1234")
     }
+
+    @Test
+    func shortAudioConfig() {
+        #expect(MpegTsAudioConfig(data: []) == nil)
+        #expect(MpegTsAudioConfig(data: [0]) == nil)
+    }
 }
