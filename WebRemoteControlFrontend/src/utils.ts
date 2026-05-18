@@ -211,8 +211,15 @@ export interface RemoteControlAssistantStreamerState {
 export function convertFilters(filters: (object | boolean)[]): [string, boolean][] {
   let result: [string, boolean][] = [];
   for (let index = 0; index < filters.length; index += 2) {
-    const name = Object.keys(filters[index] as object)[0];
-    const on = filters[index + 1] as boolean;
+    const filter = filters[index];
+    const on = filters[index + 1];
+    if (typeof filter !== "object" || filter === null || typeof on !== "boolean") {
+      continue;
+    }
+    const name = Object.keys(filter)[0];
+    if (name === undefined) {
+      continue;
+    }
     result.push([name, on]);
   }
   return result;
