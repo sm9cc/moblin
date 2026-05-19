@@ -1733,6 +1733,49 @@ Date: 2026-05-18
   - code-review-graph: risk 0.35, no affected flows; review context flags SRT sender/test gaps because Swift
     tests could not run here.
 
+## Continued sweep 2026-05-19 duplicate SRT conclusion handling
+
+### Assumptions
+
+- SRT handshakes can be repeated on UDP paths when a peer missed a previous response.
+- A duplicate conclusion after Moblin is already connected must not notify the pipeline as a new connection.
+
+### Acceptance criteria
+
+- `SrtSender` only transitions to connected from the connecting state.
+- Duplicate conclusion packets after connection do not call `srtSenderConnected()` again.
+- Existing induction, conclusion, timeout, ACK, and NAK behavior remains unchanged.
+
+### Checklist
+
+- [x] Select high-risk SRT handshake path using local code and transport-corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect and add focused regression coverage.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 48 checks:
+  - Red check: duplicate SRT conclusion packets after connection called `srtSenderConnected()` again even
+    though the sender was already connected.
+  - Corpus check: SRT handshake docs describe repeated conclusion messages on UDP paths and the reference core
+    sends repeated handshake responses for existing connections when the peer missed the first response.
+  - Green check: `handleHandshakeConclusion` now only accepts conclusions while connecting.
+  - Green check: `SrtSenderSuite` covers a duplicate conclusion after connection and requires exactly one
+    connect callback.
+  - Scope check: induction handling, conclusion packet creation, ACK handling, NAK handling, and data output are
+    unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.50, no affected flows; review context flags SRT sender/test gaps because Swift
+    tests could not run here.
+
 ## Continued sweep 2026-05-19 SRTLA server stop cleanup
 
 ### Assumptions

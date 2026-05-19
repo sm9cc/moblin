@@ -504,6 +504,9 @@ class SrtSender: @unchecked Sendable {
     }
 
     private func handleHandshakeConclusion(peerSocketId: UInt32) {
+        guard state == .connecting else {
+            return
+        }
         peerDestinationSrtSocketId = peerSocketId
         ackAckPacket.update(destinationSocketId: peerSocketId)
         keepAlivePacket.update(destinationSocketId: peerSocketId)

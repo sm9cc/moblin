@@ -6,6 +6,7 @@ private class ModelMock {
     private let connected = MessageQueue<Void>()
     private let disconnected = MessageQueue<Void>()
     private let packets = MessageQueue<String>()
+    private(set) var numberOfConnects = 0
 
     func waitForConnected() async {
         await connected.get()
@@ -22,6 +23,7 @@ private class ModelMock {
 
 extension ModelMock: SrtSenderDelegate {
     func srtSenderConnected() {
+        numberOfConnects += 1
         connected.put(())
     }
 
@@ -90,6 +92,16 @@ struct SrtSenderSuite {
         await model.waitForConnected()
         sender.send(now: .now.advanced(by: .seconds(6)))
         await model.waitForDisconnected()
+    }
+
+    @Test
+    func duplicateConclusionDoesNotReconnect() async throws {
+        let sender = SrtSender(streamId: "1234", latency: 2000, experimental: false)
+        let model = ModelMock()
+        sender.delegate = model
+        try await connect(sender: sender, model: model)
+        try sender.input(packet: createConclusionHandshake())
+        #expect(model.numberOfConnects == 1)
     }
 
     @Test
