@@ -69,6 +69,24 @@ struct HttpClientSuite {
     }
 
     @Test
+    func responseParserRejectsNegativeContentLength() {
+        let parser = HttpResponseParser()
+        parser.append(data: "HTTP/1.1 200 OK\r\nContent-Length: -1\r\n\r\n".utf8Data)
+        let (done, data) = parser.parse()
+        #expect(done)
+        #expect(data == nil)
+    }
+
+    @Test
+    func responseParserRejectsNonDecimalContentLength() {
+        let parser = HttpResponseParser()
+        parser.append(data: "HTTP/1.1 200 OK\r\nContent-Length: nope\r\n\r\n".utf8Data)
+        let (done, data) = parser.parse()
+        #expect(done)
+        #expect(data == nil)
+    }
+
+    @Test
     func responseParserGetLineCrash() {
         let parser = HttpResponseParser()
         parser.append(data: "HTTP/1.1 400 OK\r".utf8Data)

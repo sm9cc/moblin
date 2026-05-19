@@ -1985,7 +1985,7 @@ Date: 2026-05-18
 - [x] Patch the defect.
 - [x] Run targeted validation and available repo checks.
 - [x] Review changed diff and impact.
-- [ ] Commit the fix alone.
+- [x] Commit the fix alone.
 
 ### Review
 
@@ -2010,4 +2010,55 @@ Date: 2026-05-18
   - `make lint`: blocked because `swiftlint` is unavailable in this shell.
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.55 by `detect_changes`, no affected flows; review context marks `HttpServer` as
+    high impact because it is shared HTTP infrastructure.
+
+## Continued sweep 2026-05-19 HTTP response content length
+
+### Assumptions
+
+- Moblin's HTTP client parser is used by transport control-plane calls such as WHIP, WHEP, and remote service
+  requests.
+- Malformed response headers should complete as invalid responses instead of being treated as empty success or
+  waiting for impossible body lengths.
+- The fix should mirror the request-parser boundary without changing connection retry behavior.
+
+### Acceptance criteria
+
+- `Content-Length` response values must be decimal and non-negative.
+- Invalid response content lengths must complete with no response data.
+- Valid empty and body responses keep existing behavior.
+
+### Checklist
+
+- [x] Select high-risk HTTP client parser path using local code and transport-corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Add focused regression expectations.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 52 checks:
+  - Red check: `HttpResponseParser` treated `Content-Length: nope` as an empty successful response and waited
+    indefinitely for `Content-Length: -1`.
+  - Corpus check: FFmpeg RTSP request handling treats invalid `Content-Length` as an invalid request before
+    reading body data; the same length boundary applies to HTTP response body parsing.
+  - Green check: response parsing now rejects non-decimal or negative `Content-Length` values before body
+    completion logic.
+  - Regression coverage: `responseParserRejectsNegativeContentLength` and
+    `responseParserRejectsNonDecimalContentLength` expect invalid response completion with no body data.
+  - Scope check: existing 2xx status handling, valid empty responses, valid body responses, partial-header
+    parsing, and partial-body waiting behavior are unchanged.
+  - `git diff --check`: pass.
+  - changed Swift line-width scan: pass.
+  - static regression checks for the digit guard and tests: pass.
+  - `swift test --filter HttpClientSuite.responseParserRejectsNegativeContentLength`: blocked because `swift`
+    is unavailable in this shell.
+  - `swift test --filter HttpClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.60 by `detect_changes`, no affected flows; review context marks `HttpClient` as
     high impact because it is shared HTTP infrastructure.
