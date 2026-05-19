@@ -18,6 +18,15 @@ class HttpParser {
         }
         return (line, offset + rIndex + 2)
     }
+
+    func getHeader(line: String) -> (String, String)? {
+        guard let colonIndex = line.firstIndex(of: ":") else {
+            return nil
+        }
+        let name = line[..<colonIndex].lowercased() + ":"
+        let value = line[line.index(after: colonIndex)...].trim()
+        return (name, value)
+    }
 }
 
 class HttpResponseParser: HttpParser {
@@ -36,8 +45,7 @@ class HttpResponseParser: HttpParser {
         }
         var contentLength = 0
         while let (line, nextLineOffset) = getLine(data: data, offset: offset) {
-            let parts = line.lowercased().split(separator: " ")
-            if parts.count == 2, parts.first == "content-length:", let value = parts.last {
+            if let (name, value) = getHeader(line: line), name == "content-length:" {
                 guard value.allSatisfy(\.isNumber),
                       let length = Int(value)
                 else {

@@ -2062,3 +2062,55 @@ Date: 2026-05-18
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.60 by `detect_changes`, no affected flows; review context marks `HttpClient` as
     high impact because it is shared HTTP infrastructure.
+
+## Continued sweep 2026-05-19 HTTP header whitespace
+
+### Assumptions
+
+- HTTP and RTSP-style control-plane headers allow optional whitespace after the colon.
+- Moblin's request and response parsers should accept `Content-Length:10` as well as `Content-Length: 10`.
+- Keep parsed request header names compatible with existing code by retaining the trailing colon.
+
+### Acceptance criteria
+
+- Request parser accepts valid `Content-Length` with no whitespace after the colon.
+- Response parser accepts valid `Content-Length` with no whitespace after the colon.
+- Existing invalid length rejection and normal body parsing remain unchanged.
+
+### Checklist
+
+- [x] Select high-risk HTTP parser path using local code and transport-corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Add focused regression expectations.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 53 checks:
+  - Red check: request and response parsers split headers on spaces, so valid `Content-Length:10` was not
+    recognized.
+  - Corpus check: FFmpeg HTTP parsing splits header name and value at `:` and skips whitespace before the value.
+  - Corpus check: GStreamer RTSP parsing looks up `Content-Length` by header field, not by a space-delimited
+    token.
+  - Green check: shared HTTP header parsing now splits once at `:`, trims the value, and keeps lowercased names
+    with the trailing colon for existing request header compatibility.
+  - Regression coverage: request and response parser tests now cover body parsing with no whitespace after
+    `Content-Length:`.
+  - Scope check: invalid length rejection, valid body parsing, partial-header handling, partial-body waiting,
+    route lookup, request sending, and response sending are unchanged.
+  - `git diff --check`: pass.
+  - changed Swift line-width scan: pass.
+  - static regression checks for `getHeader` use and whitespace tests: pass.
+  - `swift test --filter HttpClientSuite.responseParserBodyWithoutHeaderWhitespace`: blocked because `swift` is
+    unavailable in this shell.
+  - `swift test --filter HttpClientSuite.requestParserBodyWithoutHeaderWhitespace`: blocked because `swift` is
+    unavailable in this shell.
+  - `swift test --filter HttpClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.60 by `detect_changes`, no affected flows; review context marks the shared HTTP
+    parser path as high impact because it is shared infrastructure.

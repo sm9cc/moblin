@@ -31,6 +31,16 @@ struct HttpClientSuite {
     }
 
     @Test
+    func responseParserBodyWithoutHeaderWhitespace() {
+        let parser = HttpResponseParser()
+        let body = "1234567890".utf8Data
+        parser.append(data: "HTTP/1.1 200 OK\r\nContent-Length:\(body.count)\r\n\r\n".utf8Data + body)
+        let (done, data) = parser.parse()
+        #expect(done)
+        #expect(data == body)
+    }
+
+    @Test
     func responseParserHalfHeader() {
         let parser = HttpResponseParser()
         let body = "1234567890".utf8Data
@@ -113,6 +123,18 @@ struct HttpClientSuite {
         let parser = HttpRequestParser()
         let body = "1234567890".utf8Data
         parser.append(data: "POST / HTTP/1.1\r\nContent-Length: \(body.count)\r\n\r\n".utf8Data + body)
+        let (done, request) = parser.parse()
+        #expect(done)
+        #expect(request?.method == "POST")
+        #expect(request?.path == "/")
+        #expect(request?.body == body)
+    }
+
+    @Test
+    func requestParserBodyWithoutHeaderWhitespace() {
+        let parser = HttpRequestParser()
+        let body = "1234567890".utf8Data
+        parser.append(data: "POST / HTTP/1.1\r\nContent-Length:\(body.count)\r\n\r\n".utf8Data + body)
         let (done, request) = parser.parse()
         #expect(done)
         #expect(request?.method == "POST")

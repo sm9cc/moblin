@@ -32,9 +32,8 @@ class HttpRequestParser: HttpParser {
         }
         var headers: [SettingsHttpHeader] = []
         while let (line, nextLineOffset) = getLine(data: data, offset: offset) {
-            let parts = line.lowercased().split(separator: " ")
-            if parts.count == 2 {
-                headers.append(.init(name: String(parts[0]), value: String(parts[1])))
+            if let (name, value) = getHeader(line: line) {
+                headers.append(.init(name: name, value: value))
             }
             if line.isEmpty {
                 var contentLength = 0
