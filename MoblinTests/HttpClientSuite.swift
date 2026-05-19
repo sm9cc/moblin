@@ -80,4 +80,25 @@ struct HttpClientSuite {
         #expect(done)
         #expect(data == nil)
     }
+
+    @Test
+    func requestParserRejectsNegativeContentLength() {
+        let parser = HttpRequestParser()
+        parser.append(data: "POST / HTTP/1.1\r\nContent-Length: -1\r\n\r\n".utf8Data)
+        let (done, request) = parser.parse()
+        #expect(done)
+        #expect(request == nil)
+    }
+
+    @Test
+    func requestParserBody() {
+        let parser = HttpRequestParser()
+        let body = "1234567890".utf8Data
+        parser.append(data: "POST / HTTP/1.1\r\nContent-Length: \(body.count)\r\n\r\n".utf8Data + body)
+        let (done, request) = parser.parse()
+        #expect(done)
+        #expect(request?.method == "POST")
+        #expect(request?.path == "/")
+        #expect(request?.body == body)
+    }
 }

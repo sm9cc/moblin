@@ -1,7 +1,7 @@
 import Foundation
 import Network
 
-private struct HttpRequestParseResult {
+struct HttpRequestParseResult {
     let method: String
     let path: String
     let version: String
@@ -10,7 +10,7 @@ private struct HttpRequestParseResult {
     let data: Data
 }
 
-private class HttpRequestParser: HttpParser {
+class HttpRequestParser: HttpParser {
     func parse() -> (Bool, HttpRequestParseResult?) {
         var offset = 0
         guard let (startLine, nextLineOffset) = getLine(data: data, offset: offset) else {
@@ -37,8 +37,15 @@ private class HttpRequestParser: HttpParser {
                 headers.append(.init(name: String(parts[0]), value: String(parts[1])))
             }
             if line.isEmpty {
-                let contentLengthHeader = headers.first(where: { $0.name == "content-length:" })
-                let contentLength = Int(contentLengthHeader?.value ?? "0") ?? 0
+                var contentLength = 0
+                if let contentLengthHeader = headers.first(where: { $0.name == "content-length:" }) {
+                    guard contentLengthHeader.value.allSatisfy(\.isNumber),
+                          let parsedContentLength = Int(contentLengthHeader.value)
+                    else {
+                        return (true, nil)
+                    }
+                    contentLength = parsedContentLength
+                }
                 let body = data.advanced(by: nextLineOffset)
                 guard body.count >= contentLength else {
                     return (false, nil)

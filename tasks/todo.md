@@ -1798,7 +1798,7 @@ Date: 2026-05-18
 - [x] Patch the defect.
 - [x] Run targeted validation and available repo checks.
 - [x] Review changed diff and impact.
-- [ ] Commit the fix alone.
+- [x] Commit the fix alone.
 
 ### Review
 
@@ -1962,3 +1962,52 @@ Date: 2026-05-18
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.35, no affected flows; review context flags SRT sender/test gaps because Swift
     tests could not run here.
+
+## Continued sweep 2026-05-19 HTTP request content length
+
+### Assumptions
+
+- Moblin's embedded HTTP server is exposed to remote-control and WebRTC control-plane traffic.
+- Malformed request headers should close the connection instead of crashing the parser.
+- Parser access can be kept internal for focused unit coverage without changing public app API.
+
+### Acceptance criteria
+
+- `Content-Length` values must be decimal and non-negative.
+- Invalid request content lengths must parse as a completed bad request with no request object.
+- Existing complete, partial-header, and partial-body parsing behavior remains unchanged.
+
+### Checklist
+
+- [x] Select high-risk HTTP control-plane parser path using local code and transport-corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Add focused regression expectations.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [ ] Commit the fix alone.
+
+### Review
+
+- Defect 51 checks:
+  - Red check: `HttpRequestParser` accepted `Content-Length: -1` and passed the negative count into
+    `body.prefix(contentLength)`.
+  - Corpus check: FFmpeg RTSP request handling treats invalid `Content-Length` as an invalid request before
+    reading request body data.
+  - Green check: request parsing now rejects non-decimal or negative `Content-Length` values before slicing the
+    body.
+  - Regression coverage: `requestParserRejectsNegativeContentLength` expects invalid request completion with no
+    request object, and `requestParserBody` preserves normal body parsing.
+  - Scope check: existing route lookup, response sending, file serving, and partial-body waiting behavior are
+    unchanged.
+  - `git diff --check`: pass.
+  - changed Swift line-width scan: pass.
+  - static regression checks for parser exposure, digit guard, and tests: pass.
+  - `swift test --filter HttpClientSuite.requestParserRejectsNegativeContentLength`: blocked because `swift` is
+    unavailable in this shell.
+  - `swift test --filter HttpClientSuite`: blocked because `swift` is unavailable in this shell.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.55 by `detect_changes`, no affected flows; review context marks `HttpServer` as
+    high impact because it is shared HTTP infrastructure.
