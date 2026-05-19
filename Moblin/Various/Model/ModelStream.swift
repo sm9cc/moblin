@@ -281,6 +281,7 @@ extension Model {
         media.srtStopStream()
         media.ristStopStream()
         media.whipStopStream()
+        setStreamFps()
         streamStartTime = nil
         updateStreamUptime(now: .now)
         updateSpeed(now: .now)
@@ -803,7 +804,11 @@ extension Model {
     }
 
     func setStreamFps(fps: Int? = nil) {
-        media.setFps(fps: fps ?? stream.fps, preferAutoFps: stream.lowLightBoost)
+        let configuredFps = fps ?? stream.fps
+        media.setAdaptiveFps(enabled: stream.adaptiveFps,
+                             configuredFps: configuredFps,
+                             minimumFps: stream.adaptiveFpsMinimum)
+        media.setFps(fps: configuredFps, preferAutoFps: stream.lowLightBoost)
     }
 
     func setStreamBitrate(stream: SettingsStream) {
@@ -883,7 +888,15 @@ extension Model {
         }
         if let (lines, actions) = media.updateAdaptiveBitrate(
             overlay: database.debug.debugOverlay,
-            relaxed: relaxedBitrate
+            relaxed: relaxedBitrate,
+            conditions: StreamRuntimeConditions(
+                thermalState: statusOther.thermalState,
+                isLowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled
+                    || statusTopRight.isLowPowerMode,
+                batteryLevel: battery.level,
+                batteryCharging: isBatteryCharging(),
+                cpuUsage: database.show.systemMonitor ? systemMonitor.cpu : nil
+            )
         ) {
             latestDebugLines = lines
             latestDebugActions = actions

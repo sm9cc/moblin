@@ -75,6 +75,7 @@ final class Media: NSObject, @unchecked Sendable {
     private var maximumBandwidthFollowInput: Bool = false
     let delegate: any MediaDelegate
     private var adaptiveBitrate: AdaptiveBitrate?
+    private var adaptiveFps: AdaptiveFps?
     var srtDroppedPacketsTotal: Int32 = 0
     private var videoEncoderSettings = VideoEncoderSettings()
     private var audioEncoderSettings = AudioEncoderSettings()
@@ -85,6 +86,7 @@ final class Media: NSObject, @unchecked Sendable {
     private var srtImplementation: SettingsStreamSrtImplementation = .moblin
     private var canvasSize: CGSize = .init(width: 1920, height: 1080)
     private var limitAdaptiveBitrateByTransportBitrate: Bool = true
+    private var configuredPreferAutoFps = false
 
     init(delegate: any MediaDelegate) {
         self.delegate = delegate
@@ -108,6 +110,16 @@ final class Media: NSObject, @unchecked Sendable {
 
     func setAdaptiveBitrateSettings(settings: AdaptiveBitrateSettings) {
         adaptiveBitrate?.setSettings(settings: settings)
+    }
+
+    func setAdaptiveFps(enabled: Bool, configuredFps: Int, minimumFps: Int) {
+        let validFps = makeValidFps(fps: configuredFps)
+        let validMinimumFps = makeValidAdaptiveFpsMinimum(fps: validFps, minimumFps: minimumFps)
+        if enabled && validMinimumFps < validFps {
+            adaptiveFps = AdaptiveFps(configuredFps: validFps, minimumFps: validMinimumFps)
+        } else {
+            adaptiveFps = nil
+        }
     }
 
     func stopAllNetStreams() {
@@ -299,31 +311,45 @@ final class Media: NSObject, @unchecked Sendable {
         }
     }
 
-    func updateAdaptiveBitrate(overlay: Bool, relaxed: Bool) -> ([String], [String])? {
+    func updateAdaptiveBitrate(overlay: Bool,
+                               relaxed: Bool,
+                               conditions: StreamRuntimeConditions) -> ([String], [String])?
+    {
         updateTickCount += 1
         let is200MsTick = updateTickCount % 10 == 0
         if isSrtStreamActive() {
-            return updateAdaptiveBitrateSrt(overlay: overlay, relaxed: relaxed, is200MsTick: is200MsTick)
+            return updateAdaptiveBitrateSrt(overlay: overlay,
+                                            relaxed: relaxed,
+                                            is200MsTick: is200MsTick,
+                                            conditions: conditions)
         } else if is200MsTick {
             if let rtmpStream {
-                return updateAdaptiveBitrateRtmp(overlay: overlay, rtmpStream: rtmpStream)
+                return updateAdaptiveBitrateRtmp(overlay: overlay,
+                                                 rtmpStream: rtmpStream,
+                                                 conditions: conditions)
             } else if let ristStream {
-                return updateAdaptiveBitrateRist(overlay: overlay, ristStream: ristStream)
+                return updateAdaptiveBitrateRist(overlay: overlay,
+                                                 ristStream: ristStream,
+                                                 conditions: conditions)
             }
         }
         return nil
     }
 
     private func updateAdaptiveBitrateSrt(overlay: Bool, relaxed: Bool,
-                                          is200MsTick: Bool) -> ([String], [String])?
+                                          is200MsTick: Bool,
+                                          conditions: StreamRuntimeConditions) -> ([String], [String])?
     {
         guard srtConnected else {
             return nil
         }
         if adaptiveBitrate is AdaptiveBitrateSrtBelabox {
-            return updateAdaptiveBitrateSrtBela(overlay: overlay, relaxed: relaxed, is200MsTick: is200MsTick)
+            return updateAdaptiveBitrateSrtBela(overlay: overlay,
+                                                relaxed: relaxed,
+                                                is200MsTick: is200MsTick,
+                                                conditions: conditions)
         } else if is200MsTick {
-            return updateAdaptiveBitrateSrtFight(overlay: overlay)
+            return updateAdaptiveBitrateSrtFight(overlay: overlay, conditions: conditions)
         } else {
             return nil
         }
@@ -338,8 +364,9 @@ final class Media: NSObject, @unchecked Sendable {
     }
 
     private func updateAdaptiveBitrateSrtBela(overlay: Bool,
-                                              relaxed: Bool,
-                                              is200MsTick: Bool) -> ([String], [String])?
+                                               relaxed: Bool,
+                                               is200MsTick: Bool,
+                                               conditions: StreamRuntimeConditions) -> ([String], [String])?
     {
         guard let stats = getSrtStats() else {
             return nil
@@ -357,14 +384,28 @@ final class Media: NSObject, @unchecked Sendable {
         guard let sndData else {
             return nil
         }
-        adaptiveBitrate.update(stats: StreamStats(
+        let streamStats = StreamStats(
             rttMs: stats.msRtt,
             packetsInFlight: Double(sndData),
             transportBitrate: streamTransportBitrate(),
             latency: latency,
             mbpsSendRate: stats.mbpsSendRate,
-            relaxed: relaxed
-        ))
+            relaxed: relaxed,
+            videoBitrate: videoEncoderSettings.bitrate,
+            packetsDropped: stats.pktSndDropTotal,
+            packetsRetransmitted: stats.pktRetransTotal,
+            packetsReceivedNak: stats.pktRecvNakTotal,
+            failedEncodings: numberOfFailedEncodings,
+            thermalState: conditions.thermalState,
+            isLowPowerMode: conditions.isLowPowerMode,
+            batteryLevel: conditions.batteryLevel,
+            batteryCharging: conditions.batteryCharging,
+            cpuUsage: conditions.cpuUsage
+        )
+        if is200MsTick {
+            updateAdaptiveFps(stats: streamStats)
+        }
+        adaptiveBitrate.update(stats: streamStats)
         if overlay {
             if is200MsTick {
                 belaLinesAndActions = ([
@@ -384,19 +425,33 @@ final class Media: NSObject, @unchecked Sendable {
         return belaLinesAndActions
     }
 
-    private func updateAdaptiveBitrateSrtFight(overlay: Bool) -> ([String], [String])? {
+    private func updateAdaptiveBitrateSrtFight(overlay: Bool,
+                                               conditions: StreamRuntimeConditions) -> ([String], [String])?
+    {
         guard let stats = getSrtStats() else {
             return nil
         }
         srtDroppedPacketsTotal = stats.pktSndDropTotal
-        adaptiveBitrate?.update(stats: StreamStats(
+        let streamStats = StreamStats(
             rttMs: stats.msRtt,
             packetsInFlight: Double(stats.pktFlightSize),
             transportBitrate: streamTransportBitrate(),
             latency: latency,
             mbpsSendRate: stats.mbpsSendRate,
-            relaxed: false
-        ))
+            relaxed: false,
+            videoBitrate: videoEncoderSettings.bitrate,
+            packetsDropped: stats.pktSndDropTotal,
+            packetsRetransmitted: stats.pktRetransTotal,
+            packetsReceivedNak: stats.pktRecvNakTotal,
+            failedEncodings: numberOfFailedEncodings,
+            thermalState: conditions.thermalState,
+            isLowPowerMode: conditions.isLowPowerMode,
+            batteryLevel: conditions.batteryLevel,
+            batteryCharging: conditions.batteryCharging,
+            cpuUsage: conditions.cpuUsage
+        )
+        updateAdaptiveFps(stats: streamStats)
+        adaptiveBitrate?.update(stats: streamStats)
         guard overlay else {
             return nil
         }
@@ -431,16 +486,37 @@ final class Media: NSObject, @unchecked Sendable {
         }
     }
 
-    private func updateAdaptiveBitrateRtmp(overlay: Bool, rtmpStream: RtmpStream) -> ([String], [String])? {
+    private func updateAdaptiveFps(stats: StreamStats) {
+        guard let adaptiveFps, let action = adaptiveFps.update(stats: stats) else {
+            return
+        }
+        let preferAutoFps = adaptiveFps.isConfiguredFps(fps: action.fps) && configuredPreferAutoFps
+        logger.info("adaptive-fps: \(action.message)")
+        processor?.setFps(value: Double(action.fps), preferAutoFps: preferAutoFps)
+    }
+
+    private func updateAdaptiveBitrateRtmp(overlay: Bool,
+                                           rtmpStream: RtmpStream,
+                                           conditions: StreamRuntimeConditions) -> ([String], [String])?
+    {
         let stats = rtmpStream.info.stats.value
-        adaptiveBitrate?.update(stats: StreamStats(
+        let streamStats = StreamStats(
             rttMs: stats.rttMs,
             packetsInFlight: Double(stats.packetsInFlight),
             transportBitrate: streamTransportBitrate(),
             latency: nil,
             mbpsSendRate: nil,
-            relaxed: nil
-        ))
+            relaxed: nil,
+            videoBitrate: videoEncoderSettings.bitrate,
+            failedEncodings: numberOfFailedEncodings,
+            thermalState: conditions.thermalState,
+            isLowPowerMode: conditions.isLowPowerMode,
+            batteryLevel: conditions.batteryLevel,
+            batteryCharging: conditions.batteryCharging,
+            cpuUsage: conditions.cpuUsage
+        )
+        updateAdaptiveFps(stats: streamStats)
+        adaptiveBitrate?.update(stats: streamStats)
         guard overlay else {
             return nil
         }
@@ -465,20 +541,32 @@ final class Media: NSObject, @unchecked Sendable {
         }
     }
 
-    private func updateAdaptiveBitrateRist(overlay: Bool, ristStream: RistStream) -> ([String], [String])? {
+    private func updateAdaptiveBitrateRist(overlay: Bool,
+                                           ristStream: RistStream,
+                                           conditions: StreamRuntimeConditions) -> ([String], [String])?
+    {
         let stats = ristStream.getStats()
         var rtt = 1000.0
         for stat in stats {
             rtt = min(rtt, Double(stat.rtt))
         }
-        adaptiveBitrate?.update(stats: StreamStats(
+        let streamStats = StreamStats(
             rttMs: rtt,
             packetsInFlight: 10,
             transportBitrate: nil,
             latency: nil,
             mbpsSendRate: nil,
-            relaxed: false
-        ))
+            relaxed: false,
+            videoBitrate: videoEncoderSettings.bitrate,
+            failedEncodings: numberOfFailedEncodings,
+            thermalState: conditions.thermalState,
+            isLowPowerMode: conditions.isLowPowerMode,
+            batteryLevel: conditions.batteryLevel,
+            batteryCharging: conditions.batteryCharging,
+            cpuUsage: conditions.cpuUsage
+        )
+        updateAdaptiveFps(stats: streamStats)
+        adaptiveBitrate?.update(stats: streamStats)
         ristStream.updateConnectionsWeights()
         guard overlay else {
             return nil
@@ -754,6 +842,7 @@ final class Media: NSObject, @unchecked Sendable {
     }
 
     func setFps(fps: Int, preferAutoFps: Bool) {
+        configuredPreferAutoFps = preferAutoFps
         processor?.setFps(value: Double(fps), preferAutoFps: preferAutoFps)
     }
 

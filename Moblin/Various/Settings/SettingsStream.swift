@@ -160,6 +160,20 @@ enum SettingsStreamResolution: String, Codable, CaseIterable {
 }
 
 let fpss = [120, 100, 60, 50, 30, 25, 15]
+let defaultAdaptiveFpsMinimum = 15
+
+func makeValidFps(fps: Int) -> Int {
+    fpss.contains(fps) ? fps : SettingsStream.defaultFps
+}
+
+func makeValidAdaptiveFpsMinimum(fps: Int, minimumFps: Int) -> Int {
+    let validFps = makeValidFps(fps: fps)
+    let validMinimums = fpss.filter { $0 < validFps }
+    guard let fallbackMinimum = validMinimums.last else {
+        return validFps
+    }
+    return validMinimums.contains(minimumFps) ? minimumFps : fallbackMinimum
+}
 
 enum SettingsStreamSrtImplementation: String, Codable, CaseIterable {
     case moblin = "Moblin"
@@ -1183,6 +1197,8 @@ class SettingsStream: Codable, Identifiable, Equatable, ObservableObject, Named,
     @Published var resolution: SettingsStreamResolution = SettingsStream.defaultResolution
     @Published var fps: Int = SettingsStream.defaultFps
     @Published var lowLightBoost: Bool = false
+    @Published var adaptiveFps: Bool = false
+    @Published var adaptiveFpsMinimum: Int = defaultAdaptiveFpsMinimum
     @Published var bitrate: UInt32 = 5_000_000
     @Published var rateControl: SettingsStreamRateControl = .abr
     @Published var codec: SettingsStreamCodec = .h265hevc
@@ -1273,6 +1289,8 @@ class SettingsStream: Codable, Identifiable, Equatable, ObservableObject, Named,
         case resolution
         case fps
         case autoFps
+        case adaptiveFps
+        case adaptiveFpsMinimum
         case bitrate
         case bitrateRateControl
         case codec
@@ -1362,6 +1380,8 @@ class SettingsStream: Codable, Identifiable, Equatable, ObservableObject, Named,
         try container.encode(.resolution, resolution)
         try container.encode(.fps, fps)
         try container.encode(.autoFps, lowLightBoost)
+        try container.encode(.adaptiveFps, adaptiveFps)
+        try container.encode(.adaptiveFpsMinimum, adaptiveFpsMinimum)
         try container.encode(.bitrate, bitrate)
         try container.encode(.bitrateRateControl, rateControl)
         try container.encode(.codec, codec)
@@ -1458,8 +1478,13 @@ class SettingsStream: Codable, Identifiable, Equatable, ObservableObject, Named,
             true
         )
         resolution = container.decode(.resolution, SettingsStreamResolution.self, Self.defaultResolution)
-        fps = container.decode(.fps, Int.self, Self.defaultFps)
+        fps = makeValidFps(fps: container.decode(.fps, Int.self, Self.defaultFps))
         lowLightBoost = container.decode(.autoFps, Bool.self, false)
+        adaptiveFps = container.decode(.adaptiveFps, Bool.self, false)
+        adaptiveFpsMinimum = makeValidAdaptiveFpsMinimum(
+            fps: fps,
+            minimumFps: container.decode(.adaptiveFpsMinimum, Int.self, defaultAdaptiveFpsMinimum)
+        )
         bitrate = container.decode(.bitrate, UInt32.self, 5_000_000)
         rateControl = SettingsStreamRateControl.makeValid(
             value: container.decode(.bitrateRateControl, SettingsStreamRateControl.self, .abr)
@@ -1553,6 +1578,8 @@ class SettingsStream: Codable, Identifiable, Equatable, ObservableObject, Named,
         new.resolution = resolution
         new.fps = fps
         new.lowLightBoost = lowLightBoost
+        new.adaptiveFps = adaptiveFps
+        new.adaptiveFpsMinimum = adaptiveFpsMinimum
         new.bitrate = bitrate
         new.rateControl = rateControl
         new.codec = codec

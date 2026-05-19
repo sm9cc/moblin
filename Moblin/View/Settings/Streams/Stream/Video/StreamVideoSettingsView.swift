@@ -31,11 +31,57 @@ private struct FpsSettingsView: View {
                 }
             }
             .onChange(of: stream.fps) { _ in
+                stream.adaptiveFpsMinimum = makeValidAdaptiveFpsMinimum(
+                    fps: stream.fps,
+                    minimumFps: stream.adaptiveFpsMinimum
+                )
                 model.reloadStreamIfEnabled(stream: stream)
             }
             .disabled(stream.enabled && (model.isLive || model.isRecording))
         } footer: {
             Text("Lower FPS generally gives brighter image in low light conditions.")
+        }
+    }
+}
+
+private struct AdaptiveFpsSettingsView: View {
+    @EnvironmentObject var model: Model
+    @ObservedObject var stream: SettingsStream
+
+    private func minimumFpss() -> [Int] {
+        fpss.filter { $0 < stream.fps }
+    }
+
+    private func updateAdaptiveFps() {
+        stream.adaptiveFpsMinimum = makeValidAdaptiveFpsMinimum(
+            fps: stream.fps,
+            minimumFps: stream.adaptiveFpsMinimum
+        )
+        model.setStreamFps()
+    }
+
+    var body: some View {
+        Section {
+            Toggle("Adaptive FPS", isOn: $stream.adaptiveFps)
+                .onChange(of: stream.adaptiveFps) { _ in
+                    updateAdaptiveFps()
+                }
+            if stream.adaptiveFps {
+                Picker("Minimum FPS", selection: $stream.adaptiveFpsMinimum) {
+                    ForEach(minimumFpss(), id: \.self) {
+                        Text(String($0))
+                    }
+                }
+                .onChange(of: stream.adaptiveFpsMinimum) { _ in
+                    updateAdaptiveFps()
+                }
+                .disabled(minimumFpss().isEmpty)
+            }
+        } footer: {
+            Text("""
+            Lower FPS when transport, encoder, thermal, or battery pressure is high. \
+            FPS is restored after conditions stay stable.
+            """)
         }
     }
 }
@@ -338,6 +384,7 @@ struct StreamVideoSettingsView: View {
         Form {
             ResolutionSettingsView(stream: stream)
             FpsSettingsView(stream: stream)
+            AdaptiveFpsSettingsView(stream: stream)
             LowLightBoostSettingsView(stream: stream)
             CodecSettingsView(stream: stream)
             if database.showAllSettings {
