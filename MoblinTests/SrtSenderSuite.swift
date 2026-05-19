@@ -42,8 +42,12 @@ struct SrtSenderSuite {
         #expect(!isSrtDataPacket(packet: Data()))
         #expect(!isSrtDataPacket(packet: Data([0x00])))
         #expect(!isSrtDataPacket(packet: Data([0x00, 0x00, 0x00])))
-        #expect(isSrtDataPacket(packet: Data([0x00, 0x00, 0x00, 0x00])))
-        #expect(!isSrtDataPacket(packet: Data([0x80, 0x00, 0x00, 0x00])))
+        #expect(!isSrtDataPacket(packet: Data([0x00, 0x00, 0x00, 0x00])))
+        #expect(!isSrtDataPacket(packet: Data(repeating: 0x00, count: 15)))
+        #expect(isSrtDataPacket(packet: Data(repeating: 0x00, count: 16)))
+        var controlPacket = Data(repeating: 0x00, count: 16)
+        controlPacket[0] = 0x80
+        #expect(!isSrtDataPacket(packet: controlPacket))
     }
 
     @Test

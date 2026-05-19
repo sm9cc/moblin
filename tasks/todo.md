@@ -1340,7 +1340,7 @@ Date: 2026-05-18
 - [x] Patch the defect.
 - [x] Run targeted validation and available repo checks.
 - [x] Review changed diff and impact.
-- [ ] Commit the fix alone.
+- [x] Commit the fix alone.
 
 ### Review
 
@@ -1774,6 +1774,53 @@ Date: 2026-05-18
   - `swift test --filter SrtSenderSuite`: blocked because `swift` is unavailable in this shell.
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.50, no affected flows; review context flags SRT sender/test gaps because Swift
+    tests could not run here.
+
+## Continued sweep 2026-05-19 SRT data header validation
+
+### Assumptions
+
+- A valid SRT data packet must include the full 16-byte SRT packet header.
+- Packets shorter than the SRT header must not enter data-packet accounting, ACK aggregation, or SRTLA data
+  forwarding.
+
+### Acceptance criteria
+
+- `isSrtDataPacket` returns false for packets shorter than the SRT header.
+- A 16-byte packet with the data/control bit clear still identifies as SRT data.
+- Existing sequence number, ACK, NAK, and SRTLA control packet behavior remains unchanged.
+
+### Checklist
+
+- [x] Select high-risk SRT packet classification path using local code and transport-corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Add focused regression expectation.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [ ] Commit the fix alone.
+
+### Review
+
+- Defect 47 checks:
+  - Red check: `isSrtDataPacket` accepted a 4-byte packet as data even though later data-packet paths assume a
+    full SRT header.
+  - Corpus check: SRT handshake docs define four 32-bit packet header fields, and the live-streaming docs state
+    that SRT uses a 16-byte header.
+  - Corpus check: the SRT reference core stores the packet header as a 128-bit header field.
+  - Green check: `isSrtDataPacket` now requires a 16-byte packet before checking the data/control bit.
+  - Green check: `SrtSenderSuite` covers empty, 1-byte, 3-byte, 4-byte, 15-byte, 16-byte data, and 16-byte
+    control packet classification.
+  - Scope check: sequence number reads, control packet type reads, ACK cleanup, NAK range handling, and SRTLA
+    control packet construction are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite.shortPacketsAreNotDataPackets`: blocked because `swift` is unavailable
+    in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.50, no affected flows; review context flags SRT helper/test gaps because Swift
     tests could not run here.
 
 ## Continued sweep 2026-05-19 SRTLA server stop cleanup

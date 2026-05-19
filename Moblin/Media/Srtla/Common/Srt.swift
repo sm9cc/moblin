@@ -2,7 +2,7 @@ import Foundation
 
 let srtControlPacketTypeBit: UInt16 = 0x8000
 let srtControlTypeSize = 2
-let srtSequenceNumberSize = 4
+let srtPacketHeaderSize = 16
 let srtMaximumSequenceNumber: UInt32 = 0x7FFF_FFFF
 let srtSequenceNumberRangeBit: UInt32 = 0x8000_0000
 let srtNakMaximumSequenceNumbers = 1300 / 4
@@ -20,7 +20,7 @@ enum SrtPacketType: UInt16 {
 }
 
 func isSrtDataPacket(packet: Data) -> Bool {
-    packet.count >= srtSequenceNumberSize && (packet[0] & 0x80) == 0
+    packet.count >= srtPacketHeaderSize && (packet[0] & 0x80) == 0
 }
 
 func getSrtControlPacketType(packet: Data) -> UInt16 {
