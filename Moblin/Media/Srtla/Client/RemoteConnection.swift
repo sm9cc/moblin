@@ -374,6 +374,10 @@ class RemoteConnection: @unchecked Sendable {
     }
 
     private func sendPacket(packet: Data) {
+        guard !isShortSrtDataPacket(packet: packet) else {
+            logger.info("srtla: \(typeString): SRT data packet too short (\(packet.count) bytes).")
+            return
+        }
         if isSrtDataPacket(packet: packet) {
             packetsInFlight.insert(getSrtSequenceNumber(packet: packet))
             var numberOfMpegTsPackets = (packet.count - 16) / MpegTsPacket.size
@@ -570,6 +574,10 @@ class RemoteConnection: @unchecked Sendable {
     private func handlePacketFromClient(packet: Data) {
         guard packet.count >= srtControlTypeSize else {
             logger.info("srtla: \(typeString): Packet too short (\(packet.count) bytes.")
+            return
+        }
+        guard !isShortSrtDataPacket(packet: packet) else {
+            logger.info("srtla: \(typeString): SRT data packet too short (\(packet.count) bytes).")
             return
         }
         latestReceivedTime = .now

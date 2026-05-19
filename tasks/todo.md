@@ -1667,7 +1667,7 @@ Date: 2026-05-18
 - [x] Add focused regression tests.
 - [x] Run targeted validation and available repo checks.
 - [x] Review changed diff and impact.
-- [ ] Commit the fix alone.
+- [x] Commit the fix alone.
 
 ### Review
 
@@ -1822,6 +1822,54 @@ Date: 2026-05-18
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.50, no affected flows; review context flags SRT helper/test gaps because Swift
     tests could not run here.
+
+## Continued sweep 2026-05-19 truncated SRT data routing
+
+### Assumptions
+
+- SRTLA control packets can be shorter than a full SRT header, but SRT data packets cannot.
+- A packet with the SRT data/control bit clear and fewer than 16 bytes is malformed SRT data, not SRT or SRTLA
+  control.
+
+### Acceptance criteria
+
+- Truncated SRT data-shaped packets are detected by a shared SRT helper.
+- SRTLA client and server boundary paths drop truncated data-shaped packets instead of forwarding them as
+  control.
+- Valid SRTLA control packets, valid SRT control packets, and valid SRT data packets keep their existing paths.
+
+### Checklist
+
+- [x] Select high-risk SRTLA packet boundary path using local code and transport-corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Add focused helper coverage.
+- [x] Patch SRTLA boundary guards.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [ ] Commit the fix alone.
+
+### Review
+
+- Defect 46 checks:
+  - Red check: after short SRT data packets were no longer classified as valid data, SRTLA boundary paths could
+    still route them through the control fallback.
+  - Corpus check: SRT docs define data and control by the first bit of `PH_SEQNO`, with a 16-byte SRT packet
+    header. A packet with the data bit clear and fewer than 16 bytes is malformed data, not control.
+  - Green check: `isShortSrtDataPacket` identifies truncated data-shaped packets without rejecting SRTLA
+    control packets.
+  - Green check: SRTLA client and server send/receive boundaries now drop truncated data-shaped packets before
+    the control fallback.
+  - Scope check: valid SRT data, SRT control, SRTLA registration, ACK, NAK, keepalive, and data batching paths
+    are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter SrtSenderSuite.shortPacketsWithDataBitAreMalformedDataPackets`: blocked because
+    `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.60, no affected flows; review context flags SRTLA boundary test gaps because
+    Swift tests could not run here.
 
 ## Continued sweep 2026-05-19 SRTLA server stop cleanup
 

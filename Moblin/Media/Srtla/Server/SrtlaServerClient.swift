@@ -160,7 +160,15 @@ class SrtlaServerClient: @unchecked Sendable {
 
     private func handlePacketFromLocalSrtServer(packet: Data) {
         guard packet.count >= srtControlTypeSize else {
-            logger.info("srtla-server-client: Packet from local SRT server too short (\(packet.count) bytes).")
+            logger.info(
+                "srtla-server-client: Packet from local SRT server too short (\(packet.count) bytes)."
+            )
+            return
+        }
+        guard !isShortSrtDataPacket(packet: packet) else {
+            logger.info(
+                "srtla-server-client: SRT data packet from local server too short (\(packet.count) bytes)."
+            )
             return
         }
         if isSrtDataPacket(packet: packet) {
@@ -246,6 +254,10 @@ class SrtlaServerClient: @unchecked Sendable {
 
 extension SrtlaServerClient: SrtlaServerClientConnectionDelegate {
     func handlePacketFromSrtClient(_ connection: SrtlaServerClientConnection, packet: Data) {
+        guard !isShortSrtDataPacket(packet: packet) else {
+            logger.info("srtla-server-client: SRT data packet from client too short (\(packet.count) bytes).")
+            return
+        }
         if isSrtDataPacket(packet: packet) {
             nakPacket.remove(sn: getSrtSequenceNumber(packet: packet))
             dataPacketsToSend.append(packet)

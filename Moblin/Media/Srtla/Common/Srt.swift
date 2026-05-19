@@ -23,6 +23,13 @@ func isSrtDataPacket(packet: Data) -> Bool {
     packet.count >= srtPacketHeaderSize && (packet[0] & 0x80) == 0
 }
 
+func isShortSrtDataPacket(packet: Data) -> Bool {
+    guard let firstByte = packet.first else {
+        return false
+    }
+    return packet.count < srtPacketHeaderSize && (firstByte & 0x80) == 0
+}
+
 func getSrtControlPacketType(packet: Data) -> UInt16 {
     packet.getUInt16Be() & 0x7FFF
 }

@@ -51,6 +51,15 @@ struct SrtSenderSuite {
     }
 
     @Test
+    func shortPacketsWithDataBitAreMalformedDataPackets() {
+        #expect(!isShortSrtDataPacket(packet: Data()))
+        #expect(isShortSrtDataPacket(packet: Data([0x00])))
+        #expect(isShortSrtDataPacket(packet: Data(repeating: 0x00, count: 15)))
+        #expect(!isShortSrtDataPacket(packet: Data(repeating: 0x00, count: 16)))
+        #expect(!isShortSrtDataPacket(packet: Data([0x80])))
+    }
+
+    @Test
     func processSrtNakRange() {
         let packet = createSrtNakPacket([0x8000_0001, 0x0000_0003])
         var sns: [UInt32] = []

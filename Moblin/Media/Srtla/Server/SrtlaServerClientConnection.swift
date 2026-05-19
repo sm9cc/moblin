@@ -94,6 +94,10 @@ class SrtlaServerClientConnection: @unchecked Sendable {
             logger.info("srtla-server-client: Packet too short (\(packet.count) bytes.")
             return
         }
+        guard !isShortSrtDataPacket(packet: packet) else {
+            logger.info("srtla-server-client: SRT data packet too short (\(packet.count) bytes).")
+            return
+        }
         latestReceivedTime = .now
         if isSrtDataPacket(packet: packet) {
             handleDataPacket(packet: packet)

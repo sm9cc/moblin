@@ -238,6 +238,10 @@ class SrtlaClient: NSObject, @unchecked Sendable {
     }
 
     func handleLocalPacket(packet: Data) {
+        guard !isShortSrtDataPacket(packet: packet) else {
+            logger.info("srtla: SRT data packet from local server too short (\(packet.count) bytes).")
+            return
+        }
         guard let connection = selectRemoteConnection() else {
             return
         }
