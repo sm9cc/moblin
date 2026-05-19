@@ -1733,6 +1733,50 @@ Date: 2026-05-18
   - code-review-graph: risk 0.35, no affected flows; review context flags SRT sender/test gaps because Swift
     tests could not run here.
 
+## Continued sweep 2026-05-19 SRTLA server stop cleanup
+
+### Assumptions
+
+- Each registered SRTLA server client owns remote connection state, a local SRT server connection, a periodic
+  NAK timer, and a data flush timer.
+- Stopping the SRTLA server should stop all registered client resources before dropping the local SRT sockets.
+- Existing periodic stale-client cleanup remains the normal runtime removal path while the server is running.
+
+### Acceptance criteria
+
+- `SrtlaServer.stop()` stops every registered client and clears the client table.
+- Existing listener shutdown and local SRT server shutdown still run.
+- Runtime stale-client cleanup behavior remains unchanged.
+
+### Checklist
+
+- [x] Select high-risk SRTLA server shutdown path using local code and transport-corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Defect 50 checks:
+  - Red check: `SrtlaServer.stop()` stopped the listener and SRT sockets but left registered
+    `SrtlaServerClient` instances alive with their local SRT connection, NAK timer, and flush timer.
+  - Corpus check: SRTLA receiver references tear down connection-group resources and close the associated SRT
+    socket when the group is destroyed.
+  - Green check: `SrtlaServer.stop()` now stops every registered client and clears the client table before
+    stopping the local SRT servers.
+  - Scope check: listener startup, registration, periodic stale-client removal, packet routing, and SRT server
+    stop behavior are unchanged.
+  - `git diff --check`: pass.
+  - line-width scan for changed Swift files: pass.
+  - `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+  - `make lint`: blocked because `swiftlint` is unavailable in this shell.
+  - `swift test --filter Srtla`: blocked because `swift` is unavailable in this shell.
+  - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+  - code-review-graph: risk 0.40, no affected flows; review context flags SRTLA server stop test gaps because
+    Swift tests could not run here.
+
 ## Continued sweep 2026-05-19 SRT conclusion handshake IDs
 
 ### Assumptions

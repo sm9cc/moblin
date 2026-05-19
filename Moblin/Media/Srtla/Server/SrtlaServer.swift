@@ -67,6 +67,10 @@ class SrtlaServer: @unchecked Sendable {
         srtlaServerQueue.async {
             self.stopPeriodicTimer()
             self.stopListener()
+            for client in self.clients.values {
+                client.stop()
+            }
+            self.clients.removeAll()
             self.srtServer.stop()
             self.srtServerNoSrtlaPatches.stop()
         }
