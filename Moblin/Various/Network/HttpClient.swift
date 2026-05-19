@@ -1,6 +1,9 @@
 import Foundation
 import Network
 
+let httpMaxHeaderSize = 64 * 1024
+let httpMaxContentSize = 1024 * 1024
+
 class HttpParser {
     var data = Data()
 
@@ -27,15 +30,26 @@ class HttpParser {
         let value = line[line.index(after: colonIndex)...].trim()
         return (name, value)
     }
+
+    func isPartialHeaderTooLarge(offset: Int) -> Bool {
+        data.count - offset > httpMaxHeaderSize
+    }
+
+    func isHeaderTooLarge(offset: Int) -> Bool {
+        offset > httpMaxHeaderSize
+    }
 }
 
 class HttpResponseParser: HttpParser {
     func parse() -> (Bool, Data?) {
         var offset = 0
         guard let (statusLine, nextLineOffset) = getLine(data: data, offset: offset) else {
-            return (false, nil)
+            return (isPartialHeaderTooLarge(offset: offset), nil)
         }
         offset = nextLineOffset
+        guard !isHeaderTooLarge(offset: offset) else {
+            return (true, nil)
+        }
         let statusParts = statusLine.split(separator: " ")
         guard statusLine.starts(with: "HTTP"),
               statusParts.count >= 3,
@@ -45,9 +59,13 @@ class HttpResponseParser: HttpParser {
         }
         var contentLength = 0
         while let (line, nextLineOffset) = getLine(data: data, offset: offset) {
+            guard !isHeaderTooLarge(offset: nextLineOffset) else {
+                return (true, nil)
+            }
             if let (name, value) = getHeader(line: line), name == "content-length:" {
                 guard value.allSatisfy(\.isNumber),
-                      let length = Int(value)
+                      let length = Int(value),
+                      length <= httpMaxContentSize
                 else {
                     return (true, nil)
                 }
@@ -60,7 +78,7 @@ class HttpResponseParser: HttpParser {
             }
             offset = nextLineOffset
         }
-        return (false, nil)
+        return (isPartialHeaderTooLarge(offset: offset), nil)
     }
 }
 

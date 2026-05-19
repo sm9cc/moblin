@@ -2114,3 +2114,51 @@ Date: 2026-05-18
   - `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
   - code-review-graph: risk 0.60 by `detect_changes`, no affected flows; review context marks the shared HTTP
     parser path as high impact because it is shared infrastructure.
+
+## Continued sweep 2026-05-19 HTTP parser buffering
+
+### Assumptions
+
+- The embedded HTTP server and client parsers should reject pathological headers and bodies instead of
+  buffering unbounded data.
+- The control-plane payloads handled here are small, so a 64 KiB header limit and 1 MiB content limit are
+  conservative for Moblin's HTTP use.
+- Invalid oversized messages should complete as bad parses and close or fail through existing caller paths.
+
+### Acceptance criteria
+
+- Request and response parsers reject headers larger than the configured header limit.
+- Request and response parsers reject `Content-Length` values larger than the configured content limit.
+- Valid request and response body parsing remains unchanged.
+
+### Checklist
+
+- [x] Select high-risk HTTP parser buffering path using local code and transport-corpus references.
+- [x] Confirm defect and scope the minimal fix.
+- [x] Add focused regression expectations.
+- [x] Patch the defect.
+- [x] Run targeted validation and available repo checks.
+- [x] Review changed diff and impact.
+- [x] Commit the fix alone.
+
+### Review
+
+- Transport-corpus reference: GStreamer RTSP rejects negative `Content-Length` values and values above the
+  configured content-length limit before accepting a body.
+- Root cause: `HttpParser.data` could grow without a bound while waiting for a header terminator or for a
+  declared body length that was far larger than any Moblin control-plane payload.
+- Fix: added bounded header parsing for partial and cumulative headers, and capped declared request and
+  response content length before body accumulation continues.
+- Regression coverage: request and response parser tests now cover oversized completed headers and oversized
+  declared content lengths.
+- Scope check: valid body parsing, partial-body waiting, route lookup, request sending, response sending, and
+  URLSession fallback behavior are unchanged.
+- `swift test --filter HttpClientSuite`: blocked because `swift` is unavailable in this shell.
+- `make style-check`: blocked because `swiftformat` is unavailable in this shell.
+- `make lint`: blocked because `swiftlint` is unavailable in this shell.
+- `xcodebuild -list -project Moblin.xcodeproj`: blocked because `xcodebuild` is unavailable in this shell.
+- `git diff --check`: pass.
+- changed Swift line-width scan: pass.
+- static symbol check for parser bounds and regression tests: pass.
+- code-review-graph: risk 0.60 by `detect_changes`, no affected flows; review priorities are the shared HTTP
+  response parser and parse path.

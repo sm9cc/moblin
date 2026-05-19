@@ -97,6 +97,26 @@ struct HttpClientSuite {
     }
 
     @Test
+    func responseParserRejectsOversizedHeader() {
+        let parser = HttpResponseParser()
+        parser.append(data: "HTTP/1.1 200 OK\r\nX-Test: ".utf8Data +
+            Data(repeating: 0x41, count: httpMaxHeaderSize + 1) +
+            "\r\n\r\n".utf8Data)
+        let (done, data) = parser.parse()
+        #expect(done)
+        #expect(data == nil)
+    }
+
+    @Test
+    func responseParserRejectsOversizedContentLength() {
+        let parser = HttpResponseParser()
+        parser.append(data: "HTTP/1.1 200 OK\r\nContent-Length: \(httpMaxContentSize + 1)\r\n\r\n".utf8Data)
+        let (done, data) = parser.parse()
+        #expect(done)
+        #expect(data == nil)
+    }
+
+    @Test
     func responseParserGetLineCrash() {
         let parser = HttpResponseParser()
         parser.append(data: "HTTP/1.1 400 OK\r".utf8Data)
@@ -113,6 +133,26 @@ struct HttpClientSuite {
     func requestParserRejectsNegativeContentLength() {
         let parser = HttpRequestParser()
         parser.append(data: "POST / HTTP/1.1\r\nContent-Length: -1\r\n\r\n".utf8Data)
+        let (done, request) = parser.parse()
+        #expect(done)
+        #expect(request == nil)
+    }
+
+    @Test
+    func requestParserRejectsOversizedHeader() {
+        let parser = HttpRequestParser()
+        parser.append(data: "POST / HTTP/1.1\r\nX-Test: ".utf8Data +
+            Data(repeating: 0x41, count: httpMaxHeaderSize + 1) +
+            "\r\n\r\n".utf8Data)
+        let (done, request) = parser.parse()
+        #expect(done)
+        #expect(request == nil)
+    }
+
+    @Test
+    func requestParserRejectsOversizedContentLength() {
+        let parser = HttpRequestParser()
+        parser.append(data: "POST / HTTP/1.1\r\nContent-Length: \(httpMaxContentSize + 1)\r\n\r\n".utf8Data)
         let (done, request) = parser.parse()
         #expect(done)
         #expect(request == nil)

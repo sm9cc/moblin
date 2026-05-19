@@ -14,9 +14,12 @@ class HttpRequestParser: HttpParser {
     func parse() -> (Bool, HttpRequestParseResult?) {
         var offset = 0
         guard let (startLine, nextLineOffset) = getLine(data: data, offset: offset) else {
-            return (false, nil)
+            return (isPartialHeaderTooLarge(offset: offset), nil)
         }
         offset = nextLineOffset
+        guard !isHeaderTooLarge(offset: offset) else {
+            return (true, nil)
+        }
         let startParts = startLine.split(separator: " ")
         guard startParts.count == 3 else {
             return (true, nil)
@@ -32,6 +35,9 @@ class HttpRequestParser: HttpParser {
         }
         var headers: [SettingsHttpHeader] = []
         while let (line, nextLineOffset) = getLine(data: data, offset: offset) {
+            guard !isHeaderTooLarge(offset: nextLineOffset) else {
+                return (true, nil)
+            }
             if let (name, value) = getHeader(line: line) {
                 headers.append(.init(name: name, value: value))
             }
@@ -39,7 +45,8 @@ class HttpRequestParser: HttpParser {
                 var contentLength = 0
                 if let contentLengthHeader = headers.first(where: { $0.name == "content-length:" }) {
                     guard contentLengthHeader.value.allSatisfy(\.isNumber),
-                          let parsedContentLength = Int(contentLengthHeader.value)
+                          let parsedContentLength = Int(contentLengthHeader.value),
+                          parsedContentLength <= httpMaxContentSize
                     else {
                         return (true, nil)
                     }
@@ -57,7 +64,7 @@ class HttpRequestParser: HttpParser {
             }
             offset = nextLineOffset
         }
-        return (false, nil)
+        return (isPartialHeaderTooLarge(offset: offset), nil)
     }
 }
 
